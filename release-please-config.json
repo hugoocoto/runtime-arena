@@ -9,7 +9,7 @@
       "bump-minor-pre-major": true,
       "extra-files": [
         { "type": "toml", "path": "Cargo.toml", "jsonpath": "$.workspace.package.version" },
-        { "type": "toml", "path": "Cargo.lock", "jsonpath": "$.package[?(@.name.startsWith('arena-'))].version" }
+        { "type": "toml", "path": "Cargo.lock", "jsonpath": "$.package[?(@.name.value == 'arena-cli' || @.name.value == 'arena-judge' || @.name.value == 'arena-protocol' || @.name.value == 'arena-server')].version" }
       ]
     }
   }
