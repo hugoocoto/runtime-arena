@@ -31,7 +31,7 @@ RUN make isolate default.cf
 
 # cargo-chef builds the dependencies in their own layer, so a source change only
 # recompiles the workspace crates. Works with the classic builder (no BuildKit).
-FROM lukemathwalker/cargo-chef:0.1.78-rust-1.99.1-slim-trixie AS chef
+FROM lukemathwalker/cargo-chef:0.1.78-rust-1.100.0-slim-trixie AS chef
 WORKDIR /src
 
 FROM chef AS planner
