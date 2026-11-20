@@ -1,0 +1,23 @@
+# Runtime Arena server. Usage: cp .env.example .env && docker compose up -d
+services:
+  arena:
+    image: ghcr.io/hugoocoto/runtime-arena-server:${ARENA_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: server
+    # isolate creates namespaces and cgroups for every sandbox; this needs a
+    # privileged container with its own cgroup namespace. See SECURITY.md.
+    privileged: true
+    cgroup: private
+    ports:
+      - "${ARENA_PORT:-8080}:8080"
+    environment:
+      JUDGE_CPUS: ${JUDGE_CPUS:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - arena-data:/data
+    restart: unless-stopped
+
+volumes:
+  arena-data:
