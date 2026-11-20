@@ -8,6 +8,16 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+arena-protocol = { path = "../protocol" }
+serde = { version = "1.0.229", features = ["derive"] }
+tempfile = "3.27.0"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["process", "fs", "time", "io-util"] }
+toml = "1.2.1"
+tracing = "0.1.44"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["rt", "macros"] }

@@ -74,3 +74,15 @@ jobs:
       - run: ./scripts/sandbox-smoke.sh
         env:
           SKIP_BUILD: "1"
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: judge-test
+          tags: runtime-arena-judge-test:dev
+          load: true
+          cache-from: type=gha,scope=judge-test
+          cache-to: type=gha,mode=max,scope=judge-test
+      - run: ./scripts/judge-tests.sh
+        env:
+          SKIP_BUILD: "1"
