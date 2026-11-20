@@ -125,7 +125,8 @@ async fn time_limit() {
     }
     let r = judge(14, "sum", "tle", once()).await;
     assert_eq!(verdicts(&r), [Verdict::TimeLimitExceeded; 2]);
-    assert!(r.time_ms >= 1000, "{}", r.time_ms);
+    // Killed only after the extra time (limit + 0.5 s), so the time is past the limit.
+    assert!(r.time_ms >= 1400, "{}", r.time_ms);
 }
 
 #[tokio::test]

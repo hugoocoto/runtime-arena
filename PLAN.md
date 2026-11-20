@@ -58,11 +58,12 @@ runtime-arena/
 
 - In-process worker pool: N workers, each pinned to a dedicated CPU core.
 - Tests of a submission run in sequence; each hidden test runs **K times**, and
-  the lowest CPU time is kept. Peak memory comes from the cgroup.
+  the lowest CPU time is kept. Peak memory is the program's peak RSS.
 - Checker: token-based comparison by default; a problem may ship a custom checker
   executable.
 - Per-user submission cooldown, configurable per round.
-- Stored per test: verdict, CPU time, wall time, peak memory.
+- Stored per test: verdict, CPU time, wall time, peak memory (the program's peak
+  RSS; the cgroup enforces the limit but its usage includes file cache).
 
 Board defaults (open to change):
 - Time metric = max CPU time across tests; memory metric = max peak memory across tests.

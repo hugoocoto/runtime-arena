@@ -39,7 +39,7 @@ pub struct TestResult {
     /// CPU time in milliseconds.
     pub time_ms: u64,
     pub wall_time_ms: u64,
-    /// Peak memory of the sandbox's control group, in KiB.
+    /// Peak resident memory of the program, in KiB.
     pub memory_kib: u64,
     /// Detail for non-accepted verdicts (exit code, signal, checker comment).
     pub message: Option<String>,

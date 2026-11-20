@@ -132,7 +132,7 @@ impl Judge {
 
             result.time_ms = result.time_ms.min(meta.time.as_millis() as u64);
             result.wall_time_ms = result.wall_time_ms.min(meta.wall_time.as_millis() as u64);
-            result.memory_kib = result.memory_kib.min(meta.cg_mem_kib);
+            result.memory_kib = result.memory_kib.min(meta.max_rss_kib);
 
             let failure = match classify(&meta, limits.time) {
                 Some(failure) => Some(failure),
@@ -145,7 +145,7 @@ impl Judge {
                 // Report the failing run's own numbers, not the best of earlier runs.
                 result.time_ms = meta.time.as_millis() as u64;
                 result.wall_time_ms = meta.wall_time.as_millis() as u64;
-                result.memory_kib = meta.cg_mem_kib;
+                result.memory_kib = meta.max_rss_kib;
                 result.verdict = verdict;
                 result.message = Some(message);
                 break;

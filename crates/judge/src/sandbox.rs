@@ -28,7 +28,10 @@ pub struct RunMeta {
     pub oom_killed: bool,
     pub time: Duration,
     pub wall_time: Duration,
+    /// Memory charged to the box's control group (includes file cache of written output).
     pub cg_mem_kib: u64,
+    /// Peak resident set size of the program.
+    pub max_rss_kib: u64,
     pub message: Option<String>,
 }
 
@@ -55,6 +58,7 @@ impl RunMeta {
             time: secs("time")?,
             wall_time: secs("time-wall")?,
             cg_mem_kib: num("cg-mem")?.unwrap_or(0) as u64,
+            max_rss_kib: num("max-rss")?.unwrap_or(0) as u64,
             message: kv.get("message").map(|s| s.to_string()),
         })
     }
@@ -137,7 +141,9 @@ impl Sandbox {
             .arg(format!("--meta={}", meta_file.display()))
             .arg(format!("--time={time:.3}"))
             // Keep running a bit past the limit so the reported time is real.
-            .arg(format!("--extra-time={:.3}", (time * 0.5).max(0.2)))
+            // isolate kills once the run time exceeds both --time and --extra-time,
+            // so --extra-time is the total allowed, not an addition.
+            .arg(format!("--extra-time={:.3}", time + (time * 0.5).max(0.2)))
             .arg(format!("--wall-time={:.3}", time * 3.0 + 1.0))
             .arg(format!("--cg-mem={}", limits.memory_kib))
             .arg(format!("--fsize={}", limits.output_kib))
@@ -184,6 +190,7 @@ mod tests {
         assert_eq!(m.exit_code, Some(0));
         assert_eq!(m.time, Duration::from_millis(219));
         assert_eq!(m.cg_mem_kib, 1484);
+        assert_eq!(m.max_rss_kib, 1524);
         assert!(!m.oom_killed);
     }
 
