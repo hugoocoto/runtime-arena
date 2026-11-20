@@ -78,6 +78,207 @@ impl JudgeReport {
     }
 }
 
+/// Error body of every failed API request.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ApiError {
+    pub error: String,
+}
+
+/// A participant, as shown to admins and to the participant themself.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UserInfo {
+    pub name: String,
+    pub display_name: String,
+}
+
+/// Body of `POST /api/admin/users`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CreateUser {
+    /// Login name: lowercase letters, digits and `-`.
+    pub name: String,
+    /// Shown on leaderboards; defaults to `name`.
+    pub display_name: Option<String>,
+}
+
+/// A participant's token. Returned only when it is created; the server keeps a hash.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UserToken {
+    pub name: String,
+    pub token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProblemSummary {
+    pub slug: String,
+    pub title: String,
+    /// Increases every time the problem is uploaded again.
+    pub version: i64,
+    pub time_limit_ms: u64,
+    pub memory_limit_mb: u64,
+    pub test_count: u64,
+}
+
+/// What participants see of a problem: statement and sample tests.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProblemStatement {
+    pub slug: String,
+    pub title: String,
+    pub time_limit_ms: u64,
+    pub memory_limit_mb: u64,
+    /// Markdown from `statement.md`.
+    pub statement: String,
+    pub samples: Vec<Sample>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Sample {
+    pub name: String,
+    pub input: String,
+    pub output: String,
+}
+
+/// Body of `POST /api/admin/rounds`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CreateRound {
+    pub name: String,
+    pub duration_minutes: u32,
+    /// Leaderboards stop updating this many minutes before the end (0 = never).
+    #[serde(default)]
+    pub freeze_minutes: u32,
+    /// Minimum time between two submissions of one participant.
+    #[serde(default = "default_cooldown")]
+    pub cooldown_seconds: u32,
+    /// Problem slugs, in display order.
+    pub problems: Vec<String>,
+}
+
+fn default_cooldown() -> u32 {
+    30
+}
+
+/// Body of `POST /api/admin/rounds/{id}/extend`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExtendRound {
+    pub minutes: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RoundState {
+    /// Created, not started yet.
+    Draft,
+    Running,
+    Finished,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RoundInfo {
+    pub id: i64,
+    pub name: String,
+    pub state: RoundState,
+    pub duration_minutes: u32,
+    pub freeze_minutes: u32,
+    pub cooldown_seconds: u32,
+    /// Unix time in seconds.
+    pub started_at: Option<i64>,
+    /// Unix time in seconds.
+    pub ends_at: Option<i64>,
+    /// Hidden from participants until the round starts.
+    pub problems: Vec<ProblemSummary>,
+    /// The server's clock (Unix seconds) when this was sent, so clients can show
+    /// the time left correctly even if their own clock is off.
+    pub server_time: i64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SubmissionStatus {
+    Queued,
+    Judging,
+    /// Judged; see the verdict.
+    Done,
+    /// The judge could not run it (verdict `judge_error`); an admin may rejudge.
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubmissionInfo {
+    pub id: i64,
+    pub user: String,
+    pub round_id: i64,
+    pub problem: String,
+    pub problem_version: i64,
+    pub status: SubmissionStatus,
+    pub verdict: Option<Verdict>,
+    pub time_ms: Option<u64>,
+    pub memory_kib: Option<u64>,
+    /// Unix time in seconds.
+    pub submitted_at: i64,
+    pub judged_at: Option<i64>,
+    /// Per-test results once judged.
+    pub report: Option<JudgeReport>,
+}
+
+/// One participant's best accepted result on a problem.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BoardEntry {
+    pub rank: u32,
+    pub user: String,
+    pub display_name: String,
+    pub time_ms: u64,
+    pub memory_kib: u64,
+    /// Submission that set this result.
+    pub submission_id: i64,
+    pub submitted_at: i64,
+    /// All submissions of this participant on this problem (counted up to the freeze).
+    pub attempts: u32,
+}
+
+/// The two leaderboards of one problem in one round.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Board {
+    pub round_id: i64,
+    pub problem: String,
+    /// True when submissions after the freeze are hidden from this view.
+    pub frozen: bool,
+    /// Fastest first: CPU time, then memory, then earliest submission.
+    pub by_time: Vec<BoardEntry>,
+    /// Leanest first: memory, then CPU time, then earliest submission.
+    pub by_memory: Vec<BoardEntry>,
+}
+
+/// An accepted submission as shown publicly (for rank-over-time charts).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcceptedSubmission {
+    pub submission_id: i64,
+    pub user: String,
+    pub display_name: String,
+    pub time_ms: u64,
+    pub memory_kib: u64,
+    pub submitted_at: i64,
+}
+
+/// Messages the server sends over `GET /ws`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ServerEvent {
+    /// First message: who the connection belongs to (`None` = anonymous viewer).
+    Hello { user: Option<String> },
+    /// The current round changed (started, stopped, extended).
+    Round { round: RoundInfo },
+    /// A problem's boards changed.
+    Board { board: Board },
+    /// One test of your submission was judged.
+    Progress {
+        submission_id: i64,
+        test_index: u32,
+        test_count: u32,
+        result: TestResult,
+    },
+    /// Your submission finished judging.
+    Submission { submission: SubmissionInfo },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

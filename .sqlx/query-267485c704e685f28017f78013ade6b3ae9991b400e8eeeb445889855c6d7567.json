@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, slug, title, version, dir, time_limit_ms, memory_limit_kib, test_count\n         FROM problems ORDER BY slug",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "slug",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "version",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "name": "dir",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "dir"
+          }
+        }
+      },
+      {
+        "name": "time_limit_ms",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "time_limit_ms"
+          }
+        }
+      },
+      {
+        "name": "memory_limit_kib",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "memory_limit_kib"
+          }
+        }
+      },
+      {
+        "name": "test_count",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "test_count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "267485c704e685f28017f78013ade6b3ae9991b400e8eeeb445889855c6d7567"
+}

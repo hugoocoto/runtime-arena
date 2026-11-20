@@ -1,0 +1,33 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT u.name AS user, COUNT(*) AS \"n!: i64\"\n           FROM submissions s JOIN users u ON u.id = s.user_id\n           WHERE s.round_id = ? AND s.problem_id = ? AND s.submitted_at < ?\n           GROUP BY u.name",
+  "describe": {
+    "columns": [
+      {
+        "name": "user",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "n!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "65ff9d97a761a844ce6487c80447281fb4de0f209a1c51fa34c0c55beb1cac1b"
+}

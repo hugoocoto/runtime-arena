@@ -4,3 +4,4 @@ target/
 data/
 *.md
 !README.md
+problems/

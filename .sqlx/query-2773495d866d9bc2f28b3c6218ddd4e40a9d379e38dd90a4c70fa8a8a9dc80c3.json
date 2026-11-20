@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT rp.round_id, rp.problem_id FROM round_problems rp\n             JOIN problems p ON p.id = rp.problem_id WHERE p.slug = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "round_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "round_problems",
+            "name": "round_id"
+          }
+        }
+      },
+      {
+        "name": "problem_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "round_problems",
+            "name": "problem_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2773495d866d9bc2f28b3c6218ddd4e40a9d379e38dd90a4c70fa8a8a9dc80c3"
+}

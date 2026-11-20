@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO problems\n            (slug, title, version, dir, time_limit_ms, memory_limit_kib, test_count, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n         ON CONFLICT (slug) DO UPDATE SET\n            title = excluded.title, version = excluded.version, dir = excluded.dir,\n            time_limit_ms = excluded.time_limit_ms, memory_limit_kib = excluded.memory_limit_kib,\n            test_count = excluded.test_count, updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "b3ffa31276d08a8aa7d5ee5f3b9dbf6c6096a46d13b1cab9c41e5787d78e9fc2"
+}

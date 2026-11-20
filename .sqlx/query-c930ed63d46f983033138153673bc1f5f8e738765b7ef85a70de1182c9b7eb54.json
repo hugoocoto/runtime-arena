@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE rounds SET ends_at = ends_at + ?, duration_s = duration_s + ?,\n            -- Not frozen yet: the freeze moves with the end. Already frozen: it stays.\n            freeze_at = CASE WHEN freeze_at > ? THEN freeze_at + ? ELSE freeze_at END\n         WHERE id = ? AND started_at IS NOT NULL AND ends_at > ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "c930ed63d46f983033138153673bc1f5f8e738765b7ef85a70de1182c9b7eb54"
+}

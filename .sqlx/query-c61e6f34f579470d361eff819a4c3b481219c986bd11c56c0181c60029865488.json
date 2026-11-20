@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MAX(submitted_at) FROM submissions WHERE user_id = ? AND round_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "MAX(submitted_at)",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "c61e6f34f579470d361eff819a4c3b481219c986bd11c56c0181c60029865488"
+}

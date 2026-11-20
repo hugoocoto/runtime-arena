@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO round_problems (round_id, problem_id, position) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "fc8c9d2eab88ef34adc8466ba111eae56c7c4cd4d68d782a21a9312808e8b2c2"
+}

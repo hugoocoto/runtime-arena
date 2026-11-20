@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.id, p.slug, p.title, p.version, p.dir, p.time_limit_ms, p.memory_limit_kib,\n                p.test_count\n         FROM round_problems rp JOIN problems p ON p.id = rp.problem_id\n         WHERE rp.round_id = ? ORDER BY rp.position",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "slug",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "version",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "name": "dir",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "dir"
+          }
+        }
+      },
+      {
+        "name": "time_limit_ms",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "time_limit_ms"
+          }
+        }
+      },
+      {
+        "name": "memory_limit_kib",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "memory_limit_kib"
+          }
+        }
+      },
+      {
+        "name": "test_count",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "test_count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "77229a829dfe672d710ac67070187c9311604b8040c3cce530b67bdad9a2f438"
+}

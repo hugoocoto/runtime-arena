@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE rounds SET ends_at = ? WHERE id = ? AND started_at IS NOT NULL AND ends_at > ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "68ef828e79f49877621a484b0fd7487de0a1d0506aa9ee510e85846ded37e27d"
+}
