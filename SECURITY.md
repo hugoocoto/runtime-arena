@@ -23,8 +23,10 @@ Other measures:
   hands custom checkers a private copy of the output.
 - Wrong-answer messages quote the expected answer only for sample tests, so
   hidden answers can't be read back token by token.
-- Tokens are random 256-bit values stored as SHA-256; the admin token is
-  compared in constant time. Problem archives may contain only regular files
+- Tokens are random 256-bit values stored as SHA-256; the admin token and the
+  event code are compared in constant time. Passwords are stored as argon2id
+  hashes. Anyone who knows the event code can create an account, so announce it
+  only in the room; leave `ARENA_JOIN_CODE` empty to create accounts yourself. Problem archives may contain only regular files
   and directories, at most 2 GiB unpacked.
 
 ## Reporting a vulnerability

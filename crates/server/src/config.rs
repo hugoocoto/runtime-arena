@@ -12,6 +12,9 @@ pub struct Config {
     /// Database, problems and submissions live here.
     pub data_dir: PathBuf,
     pub admin_token: String,
+    /// Event code that lets people register themselves on `/join`. `None` disables
+    /// self-registration (the admin creates every user).
+    pub join_code: Option<String>,
     /// One judge worker per isolate box. Box `i` is pinned to the `i`-th CPU of
     /// `JUDGE_CPUS` by the container entrypoint.
     pub judge_boxes: Vec<u32>,
@@ -37,6 +40,10 @@ impl Config {
                 "ARENA_ADMIN_TOKEN must be at least {MIN_ADMIN_TOKEN_LEN} characters"
             ));
         }
+        let join_code = var("ARENA_JOIN_CODE");
+        if join_code.as_ref().is_some_and(|c| c.len() < 6) {
+            return Err("ARENA_JOIN_CODE must be at least 6 characters".into());
+        }
         // The same variable the entrypoint uses to pin boxes; empty means one unpinned worker.
         let workers = var("JUDGE_CPUS")
             .map(|cpus| cpus.split(',').filter(|c| !c.trim().is_empty()).count())
@@ -54,6 +61,7 @@ impl Config {
             listen,
             data_dir,
             admin_token,
+            join_code,
             judge_boxes: (0..workers as u32).collect(),
             isolate: var("ARENA_ISOLATE")
                 .unwrap_or_else(|| "isolate".into())

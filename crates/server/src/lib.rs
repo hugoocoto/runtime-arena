@@ -1,5 +1,6 @@
 //! Runtime Arena server: HTTP API, judging queue and live updates.
 
+mod accounts;
 pub mod auth;
 pub mod backend;
 mod boards;
@@ -114,10 +115,13 @@ pub fn app(state: AppState) -> Router {
 
     Router::new()
         .route("/", get(projector))
+        .route("/join", get(accounts::page))
         .route("/healthz", get(|| async { "ok" }))
         .route("/ws", get(ws::handler))
         .route("/api/info", get(info))
         .route("/api/me", get(users::me))
+        .route("/api/signup", post(accounts::signup))
+        .route("/api/login", post(accounts::login))
         .route("/api/me/submissions", get(submissions::mine))
         .route("/api/rounds/current", get(rounds::current))
         .route("/api/rounds/{id}/boards", get(boards::round_boards))

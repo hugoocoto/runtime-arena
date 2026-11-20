@@ -35,6 +35,10 @@ impl ApiError {
         Self::new(StatusCode::UNAUTHORIZED, "missing or invalid token")
     }
 
+    pub fn unauthorized_with(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, message)
+    }
+
     /// Logs the cause and hides it from the client.
     pub fn internal(cause: impl std::fmt::Display) -> Self {
         tracing::error!(%cause, "internal error");

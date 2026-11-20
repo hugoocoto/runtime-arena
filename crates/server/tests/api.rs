@@ -252,3 +252,81 @@ async fn projector_page_is_served() {
     assert_eq!(status, StatusCode::OK);
     assert!(body.as_str().unwrap().contains("new WebSocket"));
 }
+
+#[tokio::test]
+async fn sign_up_then_log_in_from_two_devices() {
+    let s = TestServer::new().await;
+    let signup = json!({"name": "Dana", "display_name": "Dana R.", "password": "secret1", "join_code": common::JOIN_CODE});
+    let (status, body) = s.post("/api/signup", None, signup.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["name"], "dana", "names are lowercased");
+    // The name is taken now.
+    assert_eq!(
+        s.post("/api/signup", None, signup).await.0,
+        StatusCode::CONFLICT
+    );
+
+    let login = |pw: &str| json!({"name": "dana", "password": pw});
+    assert_eq!(
+        s.post("/api/login", None, login("wrong!")).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let (status, a) = s.post("/api/login", None, login("secret1")).await;
+    assert_eq!(status, StatusCode::OK, "{a}");
+    let (_, b) = s.post("/api/login", None, login("secret1")).await;
+    let (ta, tb) = (a["token"].as_str().unwrap(), b["token"].as_str().unwrap());
+    assert_ne!(ta, tb);
+    // Both devices stay logged in.
+    for t in [ta, tb] {
+        let (status, me) = s.get("/api/me", Some(t)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(me["display_name"], "Dana R.");
+    }
+    // An admin reset logs every device out.
+    s.post("/api/admin/users/dana/token", Some(ADMIN), json!({}))
+        .await;
+    assert_eq!(s.get("/api/me", Some(ta)).await.0, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn sign_up_needs_the_event_code_and_a_password() {
+    let s = TestServer::new().await;
+    let req = |code: &str, pw: &str| json!({"name": "eve", "password": pw, "join_code": code});
+    assert_eq!(
+        s.post("/api/signup", None, req("nope", "secret1")).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        s.post("/api/signup", None, req(common::JOIN_CODE, "12345"))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    // Admin-created users have no password, so password login fails for them.
+    s.post("/api/admin/users", Some(ADMIN), json!({"name": "frank"}))
+        .await;
+    let (status, _) = s
+        .post(
+            "/api/login",
+            None,
+            json!({"name": "frank", "password": "anything"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn sign_up_is_off_without_a_join_code() {
+    let s = TestServer::with_config(|c| c.join_code = None).await;
+    let (status, _) = s
+        .post(
+            "/api/signup",
+            None,
+            json!({"name": "eve", "password": "secret1", "join_code": "x"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, body) = s.get("/join", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.as_str().unwrap().contains("/api/signup"));
+}

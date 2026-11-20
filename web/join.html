@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join Runtime Arena</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #6b7280;
+    --line: #d9dde3; --accent: #2563eb; --error: #b91c1c; --ok: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b2;
+      --line: #2c323d; --accent: #60a5fa; --error: #f87171; --ok: #4ade80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b2;
+    --line: #2c323d; --accent: #60a5fa; --error: #f87171; --ok: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+    background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { width: 100%; max-width: 26rem; background: var(--panel); border: 1px solid var(--line); border-radius: .75rem; padding: 1.5rem; }
+  h1 { margin: 0 0 .25rem; font-size: 1.4rem; }
+  p.lead { margin: 0 0 1.25rem; color: var(--muted); }
+  label { display: block; font-weight: 600; margin: .9rem 0 .3rem; }
+  .hint { font-weight: 400; color: var(--muted); font-size: .85rem; }
+  input {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: .5rem; padding: .55rem .7rem;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    width: 100%; margin-top: 1.25rem; font: inherit; font-weight: 600; color: #fff;
+    background: var(--accent); border: 0; border-radius: .5rem; padding: .7rem; cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: wait; }
+  .error { color: var(--error); margin-top: .9rem; min-height: 1.5em; }
+  .done h1 { color: var(--ok); }
+  pre {
+    background: var(--bg); border: 1px solid var(--line); border-radius: .5rem; padding: .7rem;
+    overflow-x: auto; font-size: .95rem; margin: .5rem 0;
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <form id="form">
+    <h1>Join the contest</h1>
+    <p class="lead">Create your account, then log in from your terminal.</p>
+    <label for="name">Username <span class="hint">lowercase letters, digits, -</span></label>
+    <input id="name" autocomplete="username" required pattern="[a-z0-9-]{1,40}" autocapitalize="none" spellcheck="false">
+    <label for="display">Name on the leaderboard <span class="hint">optional</span></label>
+    <input id="display" maxlength="60" autocomplete="nickname">
+    <label for="password">Password <span class="hint">6+ characters</span></label>
+    <input id="password" type="password" autocomplete="new-password" required minlength="6">
+    <label for="code">Event code <span class="hint">announced by the organiser</span></label>
+    <input id="code" required autocapitalize="none" spellcheck="false">
+    <button id="submit">Create account</button>
+    <div class="error" id="error" role="alert"></div>
+  </form>
+  <section class="done" id="done" hidden>
+    <h1>You're in, <span id="who"></span>!</h1>
+    <p>Run this in your terminal and enter your username and password:</p>
+    <pre id="cmd"></pre>
+    <p class="hint">No <code>arena</code> yet? Download it from the
+      <a href="https://github.com/hugoocoto/runtime-arena/releases/latest">releases page</a>.</p>
+  </section>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+$("name").addEventListener("input", (e) => { e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""); });
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("error").textContent = "";
+  $("submit").disabled = true;
+  try {
+    const resp = await fetch("/api/signup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: $("name").value,
+        display_name: $("display").value || null,
+        password: $("password").value,
+        join_code: $("code").value,
+      }),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.error || "sign-up failed (" + resp.status + ")");
+    $("who").textContent = body.display_name;
+    $("cmd").textContent = "arena login " + location.origin;
+    $("form").hidden = true;
+    $("done").hidden = false;
+  } catch (err) {
+    $("error").textContent = err.message;
+  } finally {
+    $("submit").disabled = false;
+  }
+});
+</script>
+</body>
+</html>

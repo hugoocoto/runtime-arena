@@ -16,7 +16,7 @@ hidden tests and ranks by **execution time** and **memory**.
 | Sandbox | isolate 2.0 (cgroup v2). |
 | Rankings | Two per problem: a **time** board and a **memory** board. |
 | Overall standings | **Left open.** Raw per-test results are stored and boards are computed on demand by a pluggable scoring function, chosen per round. v1 ships per-problem boards only. |
-| Identity | Admin-issued tokens; `arena login <token>`. |
+| Identity | Self sign-up on `/join` with the event code, then `arena login` (username + password); admin-issued tokens still work. |
 | Admin | Same CLI with an admin token (`arena admin ...`). |
 | Language | Rust for server and CLI. |
 | CLI views | Live time and memory leaderboards, time-vs-memory scatter, rank over time, own submission history. |
@@ -79,6 +79,12 @@ Decided 2026-11-20. Built in three PRs: **A** schema, auth and admin API;
 - **Auth**: `Authorization: Bearer <token>`. The admin token is `ARENA_ADMIN_TOKEN`
   (required, ≥ 24 characters, or the server refuses to start). Participant tokens
   are 256-bit random (`arena_…`), shown once, stored as SHA-256.
+- **Accounts** (decided 2026-11-21): participants sign up on `/join` with a
+  username, password and the event code `ARENA_JOIN_CODE` (auto-approved; unset
+  disables sign-up). `arena login <server>` asks for username and password and
+  stores a per-device session token, so several machines can be logged in. The
+  admin can still create users and hand out tokens; `user reset` also ends all
+  sessions. Passwords are argon2id hashes.
 - **Rounds**: created as drafts, started manually, end by themselves after their
   duration; the admin can stop early or extend. One round runs at a time.
   Submissions are accepted only while a round runs. Optional `freeze_minutes`
@@ -107,6 +113,8 @@ API (part A):
 | PUT | `/api/admin/problems/{slug}` (`.tar.gz` body) | admin |
 | GET, POST | `/api/admin/rounds` | admin |
 | POST | `/api/admin/rounds/{id}/start`, `/stop`, `/extend` | admin |
+| GET | `/join` (sign-up page) | anyone |
+| POST | `/api/signup` (needs the event code), `/api/login` | anyone |
 
 ## Problem format
 
@@ -124,7 +132,7 @@ Uploaded with `arena admin problem add <dir>`.
 ## CLI
 
 ```
-arena login [--admin] <server> <token>
+arena login [server] [token] [--admin]    # no token: asks for username and password
 arena whoami | arena round | arena problem <slug> [--samples DIR]
 arena build -- <build command>          # inside the build image
 arena submit <problem> ./exe --src <file|dir> [--no-wait]
@@ -171,5 +179,5 @@ arena admin submissions [--round] | source <id> | rejudge <id>
 
 ## Not in v1
 
-Passwords/OAuth, per-language time normalization, anti-cheat recording, persistent
+OAuth, per-language time normalization, anti-cheat recording, persistent
 accounts across events, spectator/stream integration, overall standings (left open).

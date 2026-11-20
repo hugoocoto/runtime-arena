@@ -17,11 +17,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Save the server and your token (from the organiser).
+    /// Log in: asks for the username and password you created on the server's
+    /// /join page. Organisers can pass a token instead.
     Login {
-        /// e.g. http://arena.local:8080
-        server: String,
-        token: String,
-        /// Save it as the admin token instead.
+        /// e.g. arena.local:8080 (remembered after the first login)
+        server: Option<String>,
+        /// A token from the organiser, instead of username and password.
+        token: Option<String>,
+        /// Save the token as the admin token.
         #[arg(long)]
         admin: bool,
     },
@@ -171,7 +174,7 @@ async fn run(cli: Cli) -> Result<bool> {
         admin,
     } = &cli.command
     {
-        participant::login(server, token, *admin).await?;
+        participant::login(server.as_deref(), token.as_deref(), *admin).await?;
         return Ok(true);
     }
     let config = Config::load()?;

@@ -11,6 +11,7 @@ use arena_server::backend::{JudgeFuture, ProgressFn};
 use arena_server::{AppState, JudgeBackend};
 
 const ADMIN: &str = "cli-test-admin-token-0123456789";
+const JOIN_CODE: &str = "blue-falcon";
 
 /// Accepts everything except files containing "wrong".
 struct FakeJudge;
@@ -55,6 +56,7 @@ async fn start_server(data: &Path) -> String {
         listen: "127.0.0.1:0".parse().unwrap(),
         data_dir: data.to_path_buf(),
         admin_token: ADMIN.into(),
+        join_code: Some(JOIN_CODE.into()),
         judge_boxes: vec![0],
         isolate: "isolate".into(),
         runs_per_test: 1,

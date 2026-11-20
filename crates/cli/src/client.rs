@@ -21,12 +21,22 @@ pub fn init_tls() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 }
 
+/// `arena.local:8080` → `http://arena.local:8080`, without a trailing slash.
+pub fn normalise_server(server: &str) -> String {
+    let s = server.trim().trim_end_matches('/');
+    if s.is_empty() || s.starts_with("http://") || s.starts_with("https://") {
+        s.to_owned()
+    } else {
+        format!("http://{s}")
+    }
+}
+
 impl Client {
     pub fn new(server: &str, token: Option<String>) -> Result<Client> {
         init_tls();
-        let base = server.trim_end_matches('/').to_owned();
-        if !(base.starts_with("http://") || base.starts_with("https://")) {
-            bail!("server must start with http:// or https://, got {server}");
+        let base = normalise_server(server);
+        if base.is_empty() {
+            bail!("no server address given");
         }
         let http = reqwest::Client::builder()
             .user_agent(concat!("arena-cli/", env!("CARGO_PKG_VERSION")))
@@ -136,5 +146,20 @@ impl EventStream {
             }
         }
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalise_server;
+
+    #[test]
+    fn server_addresses_need_no_scheme() {
+        assert_eq!(
+            normalise_server("arena.local:8080/"),
+            "http://arena.local:8080"
+        );
+        assert_eq!(normalise_server("https://a.example"), "https://a.example");
+        assert_eq!(normalise_server(" "), "");
     }
 }
