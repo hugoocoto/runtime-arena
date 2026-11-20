@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runtime Arena</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #6b7280;
+    --line: #e3e6eb; --accent: #2563eb; --gold: #b7791f; --frozen: #0e7490;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b2;
+      --line: #262b35; --accent: #60a5fa; --gold: #f6c453; --frozen: #67e8f9;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b2;
+    --line: #262b35; --accent: #60a5fa; --gold: #f6c453; --frozen: #67e8f9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: clamp(14px, 1.3vw, 26px);
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: .5em 2em;
+    padding: 1em 1.5em; border-bottom: 1px solid var(--line);
+  }
+  h1 { margin: 0; font-size: 1.6em; }
+  .clock { font-variant-numeric: tabular-nums; font-size: 1.6em; font-weight: 700; margin-left: auto; }
+  .status { color: var(--muted); }
+  .frozen { color: var(--frozen); font-weight: 600; }
+  nav { display: flex; gap: .5em; padding: .75em 1.5em 0; flex-wrap: wrap; }
+  nav button {
+    font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    padding: .25em .9em; border-radius: 999px; cursor: pointer;
+  }
+  nav button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24em), 1fr)); gap: 1.5em; padding: 1.5em; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: .75em; padding: 1em 1.25em; }
+  h2 { margin: 0 0 .5em; font-size: 1.15em; color: var(--muted); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: .35em .4em; text-align: right; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: .85em; }
+  td.name, th.name { text-align: left; width: 100%; }
+  tr.first td { color: var(--gold); font-weight: 700; }
+  tr.moved td { animation: flash 1.5s ease-out; }
+  @keyframes flash { from { background: color-mix(in srgb, var(--accent) 30%, transparent); } to { background: transparent; } }
+  .empty { color: var(--muted); padding: 1em 0; }
+  footer { padding: 0 1.5em 1em; color: var(--muted); font-size: .8em; }
+  footer a { color: inherit; }
+  @media (prefers-reduced-motion: reduce) { tr.moved td { animation: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="round">Runtime Arena</h1>
+  <span id="frozen" class="frozen" hidden>Boards frozen</span>
+  <span id="status" class="status">connecting…</span>
+  <span id="clock" class="clock"></span>
+</header>
+<nav id="problems" aria-label="Problems"></nav>
+<main>
+  <section><h2>Fastest (CPU time)</h2><div id="by_time"></div></section>
+  <section><h2>Leanest (peak memory)</h2><div id="by_memory"></div></section>
+</main>
+<footer>Read-only view. Problems rotate every 20 s; click one to pin it. <a id="source" href="https://github.com/hugoocoto/runtime-arena">Source (AGPL-3.0)</a></footer>
+<script>
+"use strict";
+const state = { round: null, boards: {}, selected: null, pinned: false, previous: {}, offset: 0 };
+const $ = (id) => document.getElementById(id);
+
+function fmtTime(ms) { return ms >= 1000 ? (ms / 1000).toFixed(2) + " s" : ms + " ms"; }
+function fmtMem(kib) {
+  if (kib >= 10240) return (kib / 1024).toFixed(0) + " MiB";
+  if (kib >= 1024) return (kib / 1024).toFixed(1) + " MiB";
+  return kib + " KiB";
+}
+function fmtLeft(s) {
+  s = Math.max(0, s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return (h ? h + ":" + pad(m) : m) + ":" + pad(sec);
+}
+function problems() { return state.round ? state.round.problems.map((p) => p.slug) : Object.keys(state.boards).sort(); }
+
+function renderHeader() {
+  const r = state.round;
+  $("round").textContent = r ? r.name : "Runtime Arena";
+  $("frozen").hidden = !Object.values(state.boards).some((b) => b.frozen);
+  // Server clock, so a projector laptop with a wrong clock still counts down right.
+  const now = Math.floor(Date.now() / 1000) + state.offset;
+  if (!r) $("clock").textContent = "";
+  else if (r.state === "running") $("clock").textContent = fmtLeft(r.ends_at - now);
+  else $("clock").textContent = r.state === "finished" ? "finished" : "not started";
+}
+
+function renderNav() {
+  const nav = $("problems");
+  nav.replaceChildren(...problems().map((slug) => {
+    const b = document.createElement("button");
+    const title = state.round?.problems.find((p) => p.slug === slug)?.title ?? slug;
+    b.textContent = title;
+    b.setAttribute("aria-pressed", String(slug === state.selected));
+    b.onclick = () => { state.selected = slug; state.pinned = true; render(); };
+    return b;
+  }));
+}
+
+function renderTable(target, entries) {
+  const el = $(target);
+  if (!entries || entries.length === 0) {
+    el.innerHTML = '<p class="empty">No accepted solutions yet.</p>';
+    return;
+  }
+  // Remember ranks per problem, so switching problems doesn't flash every row.
+  const key = state.selected + "/" + target;
+  const prev = state.previous[key] || {};
+  const table = document.createElement("table");
+  table.innerHTML = '<thead><tr><th>#</th><th class="name">Name</th><th>Time</th><th>Memory</th><th>Subs</th></tr></thead>';
+  const body = document.createElement("tbody");
+  const ranks = {};
+  for (const e of entries) {
+    const tr = document.createElement("tr");
+    if (e.rank === 1) tr.classList.add("first");
+    if (prev[e.user] !== undefined && prev[e.user] !== e.rank) tr.classList.add("moved");
+    ranks[e.user] = e.rank;
+    for (const [text, cls] of [[e.rank], [e.display_name, "name"], [fmtTime(e.time_ms)], [fmtMem(e.memory_kib)], [e.attempts]]) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (cls) td.className = cls;
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  state.previous[key] = ranks;
+  table.append(body);
+  el.replaceChildren(table);
+}
+
+function render() {
+  const list = problems();
+  if (!list.includes(state.selected)) state.selected = list[0] ?? null;
+  renderHeader();
+  renderNav();
+  const b = state.boards[state.selected];
+  renderTable("by_time", b?.by_time);
+  renderTable("by_memory", b?.by_memory);
+}
+
+function handle(event) {
+  switch (event.type) {
+    case "round":
+      if (state.round?.id !== event.round.id) { state.boards = {}; state.previous = {}; }
+      state.round = event.round;
+      state.offset = event.round.server_time - Math.floor(Date.now() / 1000);
+      break;
+    case "board":
+      state.boards[event.board.problem] = event.board;
+      break;
+    default:
+      return;
+  }
+  render();
+}
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(proto + "//" + location.host + "/ws");
+  ws.onopen = () => { $("status").textContent = "live"; };
+  ws.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch (e) { console.error(e); } };
+  ws.onclose = () => { $("status").textContent = "reconnecting…"; setTimeout(connect, 2000); };
+}
+
+setInterval(renderHeader, 1000);
+setInterval(() => {
+  const list = problems();
+  if (state.pinned || list.length < 2) return;
+  state.selected = list[(list.indexOf(state.selected) + 1) % list.length];
+  render();
+}, 20000);
+fetch("/api/info").then((r) => r.json()).then((i) => { $("source").href = i.source_url; }).catch(() => {});
+render();
+connect();
+</script>
+</body>
+</html>

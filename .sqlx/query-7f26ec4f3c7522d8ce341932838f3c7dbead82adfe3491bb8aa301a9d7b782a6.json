@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE rounds SET started_at = ?, ends_at = ? + duration_s,\n            freeze_at = CASE WHEN freeze_s > 0 THEN ? + duration_s - freeze_s END\n         WHERE id = ? AND started_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "7f26ec4f3c7522d8ce341932838f3c7dbead82adfe3491bb8aa301a9d7b782a6"
+}

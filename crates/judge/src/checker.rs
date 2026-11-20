@@ -18,7 +18,10 @@ pub enum CheckResult {
 }
 
 /// Compares whitespace-separated tokens, so spacing and trailing newlines don't matter.
-pub fn compare_tokens(output: &[u8], answer: &[u8]) -> CheckResult {
+///
+/// The message quotes the expected token only when `reveal_answer` is set (sample
+/// tests); otherwise participants could read hidden answers token by token.
+pub fn compare_tokens(output: &[u8], answer: &[u8], reveal_answer: bool) -> CheckResult {
     let mut out = output
         .split(|b| b.is_ascii_whitespace())
         .filter(|t| !t.is_empty());
@@ -30,10 +33,16 @@ pub fn compare_tokens(output: &[u8], answer: &[u8]) -> CheckResult {
         match (out.next(), ans.next()) {
             (None, None) => return CheckResult::Accepted,
             (Some(o), Some(a)) if o == a => {}
-            (Some(o), Some(a)) => {
+            (Some(o), Some(a)) if reveal_answer => {
                 return CheckResult::WrongAnswer(format!(
                     "token {index}: expected {:?}, found {:?}",
                     clip(a),
+                    clip(o)
+                ));
+            }
+            (Some(o), Some(_)) => {
+                return CheckResult::WrongAnswer(format!(
+                    "token {index}: found {:?}, which is wrong",
                     clip(o)
                 ));
             }
@@ -105,32 +114,40 @@ mod tests {
     #[test]
     fn tokens_ignore_whitespace_layout() {
         assert_eq!(
-            compare_tokens(b"1  2\n3", b"1 2 3\n\n"),
+            compare_tokens(b"1  2\n3", b"1 2 3\n\n", true),
             CheckResult::Accepted
         );
-        assert_eq!(compare_tokens(b"", b"\n"), CheckResult::Accepted);
+        assert_eq!(compare_tokens(b"", b"\n", true), CheckResult::Accepted);
     }
 
     #[test]
     fn tokens_report_first_difference() {
         assert_eq!(
-            compare_tokens(b"1 5 3", b"1 2 3"),
+            compare_tokens(b"1 5 3", b"1 2 3", true),
             CheckResult::WrongAnswer("token 2: expected \"2\", found \"5\"".into())
         );
         assert_eq!(
-            compare_tokens(b"1", b"1 2"),
+            compare_tokens(b"1", b"1 2", true),
             CheckResult::WrongAnswer("output ends before token 2".into())
         );
         assert_eq!(
-            compare_tokens(b"1 2 3", b"1 2"),
+            compare_tokens(b"1 2 3", b"1 2", true),
             CheckResult::WrongAnswer("extra output from token 3".into())
+        );
+    }
+
+    #[test]
+    fn hidden_answers_are_not_quoted() {
+        assert_eq!(
+            compare_tokens(b"1 5 3", b"1 2 3", false),
+            CheckResult::WrongAnswer("token 2: found \"5\", which is wrong".into())
         );
     }
 
     #[test]
     fn tokens_are_compared_exactly() {
         assert!(matches!(
-            compare_tokens(b"7.0", b"7"),
+            compare_tokens(b"7.0", b"7", true),
             CheckResult::WrongAnswer(_)
         ));
     }

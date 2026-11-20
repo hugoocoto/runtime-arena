@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE submissions SET status = 'queued', verdict = NULL, time_ms = NULL,\n                memory_kib = NULL, report = NULL, error = NULL, judged_at = NULL,\n                problem_version = ?, problem_dir = ?\n             WHERE problem_id = (SELECT id FROM problems WHERE slug = ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "9a1255be8e6521720473d0d9b8f80288acf9a47f6658dce78cb818d742cc1664"
+}

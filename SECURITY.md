@@ -17,6 +17,16 @@ containers; we do it for easy deployment, and CI checks the sandbox verdicts
   data or services.
 - Keep the image updated; isolate is pinned in `docker/Dockerfile`.
 
+Other measures:
+
+- The judge never follows a link a program leaves in place of its output, and
+  hands custom checkers a private copy of the output.
+- Wrong-answer messages quote the expected answer only for sample tests, so
+  hidden answers can't be read back token by token.
+- Tokens are random 256-bit values stored as SHA-256; the admin token is
+  compared in constant time. Problem archives may contain only regular files
+  and directories, at most 2 GiB unpacked.
+
 ## Reporting a vulnerability
 
 Please report privately through

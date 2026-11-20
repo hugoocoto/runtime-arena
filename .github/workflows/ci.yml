@@ -14,6 +14,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Check sqlx queries against the committed .sqlx/ data (scripts/sqlx-prepare.sh).
+  SQLX_OFFLINE: "true"
 
 jobs:
   rust:

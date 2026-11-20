@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.id AS submission_id, u.name AS user, u.display_name,\n                  s.time_ms AS \"time_ms!\", s.memory_kib AS \"memory_kib!\", s.submitted_at\n           FROM submissions s JOIN users u ON u.id = s.user_id\n           WHERE s.round_id = ? AND s.problem_id = ? AND s.status = 'done'\n             AND s.verdict = 'accepted' AND s.submitted_at < ?\n           ORDER BY s.submitted_at, s.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "submission_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "display_name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "name": "time_ms!",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "time_ms"
+          }
+        }
+      },
+      {
+        "name": "memory_kib!",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "memory_kib"
+          }
+        }
+      },
+      {
+        "name": "submitted_at",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "submitted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "78c6681b8197c4fa86d97bd1959afd29a31d98e59835e3e130051c1dc3428f18"
+}

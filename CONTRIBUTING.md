@@ -32,7 +32,20 @@ macOS and Windows and pushes the `server` and `build-env` images to GHCR.
 | `docker/` | Dockerfile (`server`, `build-env` targets) and entrypoint |
 | `tests/sandbox` | programs and checks for the sandbox verdict test |
 | `crates/judge/tests` | judge tests against real isolate, with fixture problems |
-| `scripts/` | sandbox smoke test, judge tests in Docker, host tuning |
+| `crates/server/migrations` | SQLite schema migrations |
+| `crates/server/tests`, `crates/cli/tests` | API, queue, WebSocket and CLI tests with a fake judge |
+| `web/` | projector page, built into the server binary |
+| `problems/` | example problem with reference solutions |
+| `scripts/` | sandbox smoke test, judge tests in Docker, mock contest, sqlx query data, host tuning |
+
+## Database queries
+
+The server uses sqlx's compile-checked queries. CI and the Docker build check
+them against the committed `.sqlx/` directory (`SQLX_OFFLINE=true`), so after
+changing a query or a migration run `scripts/sqlx-prepare.sh` (needs
+`cargo install --locked sqlx-cli --no-default-features --features sqlite`) and
+commit `.sqlx/`. A build that says "no cached data for this query" means it is
+out of date.
 
 ## Toolchain
 

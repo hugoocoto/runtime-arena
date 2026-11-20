@@ -13,6 +13,7 @@ services:
     ports:
       - "${ARENA_PORT:-8080}:8080"
     environment:
+      ARENA_ADMIN_TOKEN: ${ARENA_ADMIN_TOKEN:?set ARENA_ADMIN_TOKEN in .env (openssl rand -hex 32)}
       JUDGE_CPUS: ${JUDGE_CPUS:-}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:

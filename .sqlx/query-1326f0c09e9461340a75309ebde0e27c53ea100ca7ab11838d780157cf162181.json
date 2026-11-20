@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE submissions SET status = 'judging'\n         WHERE id = (SELECT id FROM submissions WHERE status = 'queued' ORDER BY id LIMIT 1)\n         RETURNING id, user_id, round_id, problem_id, problem_version, problem_dir",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "round_id",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "round_id"
+          }
+        }
+      },
+      {
+        "name": "problem_id",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "problem_id"
+          }
+        }
+      },
+      {
+        "name": "problem_version",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "problem_version"
+          }
+        }
+      },
+      {
+        "name": "problem_dir",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "problem_dir"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1326f0c09e9461340a75309ebde0e27c53ea100ca7ab11838d780157cf162181"
+}

@@ -1,0 +1,170 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.id, s.user_id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version,\n                s.status, s.verdict, s.time_ms, s.memory_kib, s.report, s.submitted_at, s.judged_at\n         FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id\n         WHERE s.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "user",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "round_id",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "round_id"
+          }
+        }
+      },
+      {
+        "name": "problem",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "problems",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "name": "problem_version",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "problem_version"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "verdict",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "verdict"
+          }
+        }
+      },
+      {
+        "name": "time_ms",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "time_ms"
+          }
+        }
+      },
+      {
+        "name": "memory_kib",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "memory_kib"
+          }
+        }
+      },
+      {
+        "name": "report",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "report"
+          }
+        }
+      },
+      {
+        "name": "submitted_at",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "submitted_at"
+          }
+        }
+      },
+      {
+        "name": "judged_at",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "judged_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "68a9ee3975d9c99640bf535df8997fcd0370b631ffe130c2d20f5361e3bc3bd0"
+}

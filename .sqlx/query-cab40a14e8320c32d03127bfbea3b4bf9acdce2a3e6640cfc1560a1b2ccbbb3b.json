@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, duration_s, freeze_s, cooldown_s, started_at, ends_at, freeze_at\n         FROM rounds WHERE started_at IS NOT NULL ORDER BY started_at DESC, id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "duration_s",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "duration_s"
+          }
+        }
+      },
+      {
+        "name": "freeze_s",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "freeze_s"
+          }
+        }
+      },
+      {
+        "name": "cooldown_s",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "cooldown_s"
+          }
+        }
+      },
+      {
+        "name": "started_at",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "name": "ends_at",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "ends_at"
+          }
+        }
+      },
+      {
+        "name": "freeze_at",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "rounds",
+            "name": "freeze_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "cab40a14e8320c32d03127bfbea3b4bf9acdce2a3e6640cfc1560a1b2ccbbb3b"
+}

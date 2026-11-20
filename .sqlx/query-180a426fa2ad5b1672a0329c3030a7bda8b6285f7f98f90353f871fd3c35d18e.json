@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) FROM round_problems rp\n         JOIN rounds r ON r.id = rp.round_id\n         JOIN problems p ON p.id = rp.problem_id\n         WHERE p.slug = ? AND r.started_at IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "COUNT(*)",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "180a426fa2ad5b1672a0329c3030a7bda8b6285f7f98f90353f871fd3c35d18e"
+}

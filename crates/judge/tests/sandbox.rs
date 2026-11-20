@@ -105,7 +105,8 @@ async fn wrong_answer_names_the_failing_test() {
     assert_eq!(failed.name, "02");
     assert_eq!(
         failed.message.as_deref(),
-        Some("token 1: expected \"30\", found \"31\"")
+        // Test 02 is hidden, so its answer is not quoted.
+        Some("token 1: found \"31\", which is wrong")
     );
 }
 
@@ -159,4 +160,32 @@ async fn output_limit() {
     };
     let r = judge(17, "sum", "ole", config).await;
     assert_eq!(verdicts(&r), [Verdict::OutputLimitExceeded; 2]);
+}
+
+#[tokio::test]
+async fn output_replaced_by_a_symlink_is_not_trusted() {
+    if !enabled() {
+        return;
+    }
+    // The program links its output to the real answer file on the host; the
+    // judge must not follow it. isolate passes no environment, so the path is
+    // compiled in instead.
+    let dir = tempfile::tempdir().unwrap();
+    let answer = problem("sum").tests[0].answer.canonicalize().unwrap();
+    let src = repo().join("tests/sandbox/symlink.c");
+    let exe = dir.path().join("symlink");
+    let status = Command::new("cc")
+        .args(["-O2", "-o"])
+        .arg(&exe)
+        .arg(format!("-DANSWER=\"{}\"", answer.display()))
+        .arg(&src)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let r = Judge::new(once(), 18)
+        .judge(&problem("sum"), &exe)
+        .await
+        .unwrap();
+    eprintln!("{r:#?}");
+    assert_ne!(r.tests[0].verdict, Verdict::Accepted);
 }

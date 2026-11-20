@@ -84,6 +84,17 @@ impl Judge {
     /// Errors mean the judge could not do its job (sandbox failure, unreadable
     /// files); problems with the submission are verdicts in the report.
     pub async fn judge(&self, problem: &Problem, executable: &Path) -> Result<JudgeReport, Error> {
+        self.judge_with_progress(problem, executable, |_, _| {})
+            .await
+    }
+
+    /// Like [`Judge::judge`], calling `on_test(index, result)` after each test.
+    pub async fn judge_with_progress(
+        &self,
+        problem: &Problem,
+        executable: &Path,
+        mut on_test: impl FnMut(usize, &TestResult) + Send,
+    ) -> Result<JudgeReport, Error> {
         let scratch = tempfile::tempdir().map_err(|e| Error::io(Path::new("tempdir"), e))?;
         let limits = Limits {
             time: problem.time_limit,
@@ -99,6 +110,7 @@ impl Judge {
             self.sandbox.cleanup().await?;
             let result = result?;
             tracing::debug!(test = %result.name, verdict = ?result.verdict, "test judged");
+            on_test(results.len(), &result);
             results.push(result);
         }
         Ok(JudgeReport::from_tests(results))
@@ -137,7 +149,7 @@ impl Judge {
             let failure = match classify(&meta, limits.time) {
                 Some(failure) => Some(failure),
                 None => {
-                    self.check_output(problem, test, &box_dir.join("out"))
+                    self.check_output(problem, test, &box_dir.join("out"), scratch)
                         .await?
                 }
             };
@@ -159,21 +171,39 @@ impl Judge {
         problem: &Problem,
         test: &TestCase,
         output: &Path,
+        scratch: &Path,
     ) -> Result<Option<(Verdict, String)>, Error> {
+        // The box is writable by the program: never follow a link it may have left
+        // in place of its output (it could point at the answer file).
+        let out = match tokio::fs::symlink_metadata(output).await {
+            Ok(m) if m.file_type().is_file() => tokio::fs::read(output)
+                .await
+                .map_err(|e| Error::io(output, e))?,
+            Ok(_) => {
+                let msg = "the output is not a regular file".to_owned();
+                return Ok(Some((Verdict::WrongAnswer, msg)));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(Error::io(output, e)),
+        };
         let checked = match &problem.checker {
             Some(checker) => {
-                match checker::run_checker(checker, &test.input, output, &test.answer).await {
+                // Hand the checker a private copy, not a path inside the box.
+                let copy = scratch.join("output");
+                tokio::fs::write(&copy, &out)
+                    .await
+                    .map_err(|e| Error::io(&copy, e))?;
+                match checker::run_checker(checker, &test.input, &copy, &test.answer).await {
                     Ok(r) => r,
                     // A broken checker is the judge's fault, not the submission's.
                     Err(e) => return Ok(Some((Verdict::JudgeError, e.to_string()))),
                 }
             }
             None => {
-                let out = tokio::fs::read(output).await.unwrap_or_default();
                 let ans = tokio::fs::read(&test.answer)
                     .await
                     .map_err(|e| Error::io(&test.answer, e))?;
-                compare_tokens(&out, &ans)
+                compare_tokens(&out, &ans, problem.samples.contains(&test.name))
             }
         };
         Ok(match checked {

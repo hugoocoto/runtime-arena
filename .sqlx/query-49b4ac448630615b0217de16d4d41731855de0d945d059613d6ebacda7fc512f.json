@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO submissions\n            (user_id, round_id, problem_id, problem_version, problem_dir, status, submitted_at)\n         VALUES (?, ?, ?, ?, ?, 'queued', ?) RETURNING id AS \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "49b4ac448630615b0217de16d4d41731855de0d945d059613d6ebacda7fc512f"
+}

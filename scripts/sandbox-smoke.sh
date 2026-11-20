@@ -6,6 +6,8 @@
 #   runtime-arena-build-env:dev and ghcr.io/hugoocoto/runtime-arena-server:latest
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# compose.yaml requires an admin token; the smoke test never uses the API.
+export ARENA_ADMIN_TOKEN="${ARENA_ADMIN_TOKEN:-sandbox-smoke-test-token-not-secret}"
 
 if [ -z "${SKIP_BUILD:-}" ]; then
     docker build -f docker/Dockerfile --target build-env -t runtime-arena-build-env:dev .
