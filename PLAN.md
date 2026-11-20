@@ -102,6 +102,10 @@ arena admin round create|start|stop ...
    P-core: min 0.103 s, median 0.105 s, max 0.128 s over 30 runs, so K≥3 is
    worthwhile. E-cores are ~50% slower; pin to P-cores only.
 2. `judge` crate: run a binary against tests, produce verdict, time and memory.
+   Every test runs (the report names each failing test); accepted tests are
+   repeated `runs_per_test` times (default 3) and keep the best time and memory;
+   each run gets a fresh box. Single process (`--processes=1`). Custom checkers
+   use the testlib convention (`checker in out ans`, exit 0 = AC, 1/2 = WA).
 3. `server`: schema, auth, problems, rounds, submission queue, WebSocket events.
 4. `cli`: login, problems, submit, admin commands.
 5. `cli` board TUI views.

@@ -56,6 +56,7 @@ docker run --rm --platform linux/amd64 -v "$PWD:/work" \
 ```sh
 cargo build && cargo test
 scripts/sandbox-smoke.sh   # builds the images and checks sandbox verdicts (needs Docker)
+scripts/judge-tests.sh     # judge crate tests against a real isolate (needs Docker)
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

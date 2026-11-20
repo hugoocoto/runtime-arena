@@ -46,6 +46,24 @@ COPY . .
 RUN cargo build --release --locked -p arena-server \
  && cp target/release/arena-server /arena-server
 
+# Runs the judge crate's sandbox tests against a real isolate. Run privileged
+# with a private cgroup namespace (scripts/judge-tests.sh). Not published.
+FROM chef AS judge-test
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libcap2 libseccomp2 python3 \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=isolate /src/isolate /usr/local/bin/isolate
+COPY --from=isolate /src/default.cf /usr/local/etc/isolate.default
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY rust-toolchain.toml ./
+COPY --from=planner /src/recipe.json recipe.json
+RUN cargo chef cook --tests --locked -p arena-judge --recipe-path recipe.json
+COPY . .
+RUN cargo test --no-run --locked -p arena-judge
+ENV ARENA_ISOLATE_TESTS=1
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["cargo", "test", "--locked", "-p", "arena-judge"]
+
 FROM base AS build-env
 RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc g++ libc6-dev make git \

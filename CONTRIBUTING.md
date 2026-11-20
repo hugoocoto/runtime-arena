@@ -8,8 +8,12 @@
    title becomes the commit that [release-please](https://github.com/googleapis/release-please)
    uses to pick the next version and write the changelog.
 3. CI must pass: formatting, clippy with warnings denied, tests, cargo-deny
-   (licenses and advisories), CLI builds on macOS and Windows, and the sandbox
-   verdict check.
+   (licenses and advisories), CLI builds on macOS and Windows, the sandbox
+   verdict check and the judge's sandbox tests.
+
+   Plain `cargo test` skips the judge tests that need isolate (they print
+   "skipped"). Run them with `scripts/judge-tests.sh`, which builds a test image
+   and runs it privileged.
 
 ## Releases
 
@@ -27,7 +31,8 @@ macOS and Windows and pushes the `server` and `build-env` images to GHCR.
 | `crates/cli` | `arena` CLI |
 | `docker/` | Dockerfile (`server`, `build-env` targets) and entrypoint |
 | `tests/sandbox` | programs and checks for the sandbox verdict test |
-| `scripts/` | sandbox smoke test, host tuning |
+| `crates/judge/tests` | judge tests against real isolate, with fixture problems |
+| `scripts/` | sandbox smoke test, judge tests in Docker, host tuning |
 
 ## Toolchain
 

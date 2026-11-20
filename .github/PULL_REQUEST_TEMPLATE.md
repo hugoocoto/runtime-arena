@@ -6,4 +6,4 @@
 ## How it was tested
 
 - [ ] `cargo fmt`, `cargo clippy -- -D warnings`, `cargo test`
-- [ ] `scripts/sandbox-smoke.sh` (if the judge, sandbox or images changed)
+- [ ] `scripts/sandbox-smoke.sh` and `scripts/judge-tests.sh` (if the judge, sandbox or images changed)
