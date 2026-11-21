@@ -99,7 +99,7 @@ dependencies = [
 
 [[package]]
 name = "arena-cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "arena-judge",
@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "arena-judge"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "arena-protocol",
  "serde",
@@ -144,7 +144,7 @@ dependencies = [
 
 [[package]]
 name = "arena-protocol"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "arena-server"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "arena-judge",
  "arena-protocol",
