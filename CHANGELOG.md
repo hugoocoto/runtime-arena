@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/hugoocoto/runtime-arena/compare/v0.2.0...v0.3.0) (2026-11-21)
+
+
+### Features
+
+* web sign-up and password login for participants ([#7](https://github.com/hugoocoto/runtime-arena/issues/7)) ([43ca42c](https://github.com/hugoocoto/runtime-arena/commit/43ca42c4b3f8ff29d2f44fca1d4af75efe14021b))
+
 ## [0.2.0](https://github.com/hugoocoto/runtime-arena/compare/v0.1.0...v0.2.0) (2026-11-20)
 
 
