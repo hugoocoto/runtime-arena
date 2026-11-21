@@ -75,5 +75,7 @@
     if (-not $onPath) {
         Write-Host 'Add it to your PATH: Settings > Environment Variables > Path, then add:'
         Write-Host "  $prefix"
+        $env:Path = "$prefix$([IO.Path]::PathSeparator)$env:Path"
     }
+    & (Join-Path $prefix 'arena.exe') --version
 }

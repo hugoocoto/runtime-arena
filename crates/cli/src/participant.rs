@@ -610,11 +610,10 @@ pub fn build(image: &str, command: &[String]) -> Result<bool> {
             docker.args(["--user", &format!("{uid}:{gid}")]);
         }
     }
-    let status = docker
-        .arg(image)
-        .args(command)
-        .status()
-        .context("cannot run docker; is it installed and running?")?;
+    let status = docker.arg(image).args(command).status().context(
+        "cannot run Docker; is it installed and running? For a first submission, use a ".to_owned()
+            + "#!/usr/bin/env python3 script instead",
+    )?;
     Ok(status.success())
 }
 

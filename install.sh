@@ -103,8 +103,13 @@ $sudo install -m 644 "$src/completions/arena.fish" "$share/fish/vendor_completio
 
 echo "Installed arena $tag to $prefix/bin/arena"
 case :$PATH: in
-*:"$prefix/bin":*) ;;
-*) echo "Add it to your PATH: export PATH=\"$prefix/bin:\$PATH\"" ;;
+*:"$prefix/bin":*)
+    "$prefix/bin/arena" --version
+    ;;
+*)
+    echo "Add it to your PATH: export PATH=\"$prefix/bin:\$PATH\""
+    echo "Then verify it with: arena --version"
+    ;;
 esac
 case ${SHELL:-} in
 */zsh) echo "For zsh completions, add before compinit: fpath=(\"$share/zsh/site-functions\" \$fpath)" ;;
