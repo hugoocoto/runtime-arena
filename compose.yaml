@@ -1,4 +1,5 @@
-# Runtime Arena server. Usage: cp .env.example .env && docker compose up -d
+# Runtime Arena server and automatic HTTPS proxy.
+# Usage: cp .env.example .env && docker compose up -d
 services:
   arena:
     image: ghcr.io/hugoocoto/runtime-arena-server:${ARENA_VERSION:-latest}
@@ -11,7 +12,9 @@ services:
     privileged: true
     cgroup: private
     ports:
-      - "${ARENA_PORT:-8080}:8080"
+      # Local-only access is retained for the organiser's admin CLI. Participants
+      # use Caddy on HTTPS below.
+      - "127.0.0.1:${ARENA_PORT:-8080}:8080"
     environment:
       ARENA_ADMIN_TOKEN: ${ARENA_ADMIN_TOKEN:?set ARENA_ADMIN_TOKEN in .env (openssl rand -hex 32)}
       ARENA_JOIN_CODE: ${ARENA_JOIN_CODE:-}
@@ -26,5 +29,23 @@ services:
       - arena-data:/data
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2.10.2-alpine
+    depends_on:
+      arena:
+        condition: service_started
+    environment:
+      ARENA_DOMAIN: ${ARENA_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
 volumes:
   arena-data:
+  caddy-data:
+  caddy-config:

@@ -22,7 +22,11 @@ pub fn admin(config: &Config) -> Result<Client> {
                 .into(),
         )
     })?;
-    Client::new(config.server()?, Some(token))
+    Client::with_ca(
+        config.server()?,
+        Some(token),
+        config.ca_certificate.as_deref(),
+    )
 }
 
 const UPGRADE_HINT: &str = "Update the host with: docker compose pull && docker compose up -d\n\

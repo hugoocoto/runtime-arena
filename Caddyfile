@@ -1,0 +1,21 @@
+# Caddy obtains and renews the certificate automatically when ARENA_DOMAIN is a
+# public DNS name pointing at this host. With the default `localhost`, Caddy uses
+# its local CA instead, which is useful for a private rehearsal.
+{$ARENA_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy arena:8080
+}
+
+# The LAN CA is public information and is served over plain HTTP solely to let
+# `arena trust` bootstrap trust before the client can verify HTTPS. The command
+# prints the certificate fingerprint and asks for confirmation before saving it.
+http://{$ARENA_DOMAIN} {
+	handle /arena-ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		file_server
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}

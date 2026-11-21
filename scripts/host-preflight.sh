@@ -40,6 +40,12 @@ else
     fail "Docker is not installed"
 fi
 
+if command -v curl >/dev/null 2>&1; then
+    ok "curl"
+else
+    fail "curl is required for the HTTPS readiness check"
+fi
+
 if [ ! -f .env ]; then
     fail "missing .env; copy .env.example to .env first"
 else
@@ -60,6 +66,15 @@ else
     else
         fail "ARENA_JOIN_CODE must be empty or at least 6 characters"
     fi
+
+    domain=$(sed -n 's/^ARENA_DOMAIN=//p' .env | tail -n 1)
+    domain=${domain#\"}
+    domain=${domain%\"}
+    if [ -n "$domain" ] && [ "$domain" != "arena.example.com" ]; then
+        ok "HTTPS domain configured ($domain)"
+    else
+        fail "ARENA_DOMAIN must be replaced with the public HTTPS domain"
+    fi
 fi
 
 if command -v docker >/dev/null 2>&1 && [ -f .env ]; then
@@ -71,7 +86,8 @@ if command -v docker >/dev/null 2>&1 && [ -f .env ]; then
 fi
 
 if [ "$errors" -eq 0 ]; then
-    printf 'Host is ready. Run: docker compose up -d\n'
+    printf 'Host is ready. Run: scripts/deploy.sh\n'
+    printf 'Participants connect at: https://%s\n' "$domain"
 else
     printf '%s prerequisite(s) need attention.\n' "$errors" >&2
     exit 1

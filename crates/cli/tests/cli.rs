@@ -135,6 +135,7 @@ async fn organiser_and_participant_flow() {
         server: Some(server.clone()),
         token: Some(alice.token.clone()),
         admin_token: None,
+        ca_certificate: None,
     };
     let work = tempfile::tempdir().unwrap();
     let src = work.path().join("sol.c");
