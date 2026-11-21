@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/hugoocoto/runtime-arena/compare/v0.6.0...v0.7.0) (2026-11-21)
+
+
+### Features
+
+* improve participant onboarding and host checks ([#15](https://github.com/hugoocoto/runtime-arena/issues/15)) ([5408a2e](https://github.com/hugoocoto/runtime-arena/commit/5408a2efd013a1c379f93d2ebe44a58c4c9f1799))
+
 ## [0.6.0](https://github.com/hugoocoto/runtime-arena/compare/v0.5.0...v0.6.0) (2026-11-21)
 
 
