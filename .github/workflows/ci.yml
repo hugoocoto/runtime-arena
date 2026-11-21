@@ -48,6 +48,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: EmbarkStudios/cargo-deny-action@70f81531115945ba6eb6b941ec9d39d063438eb9 # v2.1.2
 
+  deployment:
+    name: Compose HTTPS deployment
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate Compose and shell scripts
+        run: |
+          ARENA_ADMIN_TOKEN=ci-compose-validation-token-123456 \
+          ARENA_DOMAIN=localhost \
+          docker compose --env-file /dev/null config --quiet
+          sh -n scripts/*.sh
+      - name: Validate Caddy configuration
+        run: |
+          docker pull caddy:2.10.2-alpine
+          docker run --rm \
+            --env ARENA_DOMAIN=localhost \
+            --volume "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   sandbox:
     name: sandbox verdicts (isolate in compose)
     runs-on: ubuntu-24.04

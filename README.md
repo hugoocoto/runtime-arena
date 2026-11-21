@@ -33,16 +33,25 @@ use a `#!` script such as Python.
    arena --version
    ```
 
-2. Create an account. Use the server address and event code announced by the
-   organiser. Replace `<port>` with the host's `ARENA_PORT` from `.env` (the
-   default is `8080`):
+2. Create an account. Use the HTTPS address and event code announced by the
+   organiser. Replace `<domain>` with the host's `ARENA_DOMAIN` from `.env`:
 
    ```sh
-   arena signup http://<host>:<port>
+   # LAN deployments using Caddy's private certificate:
+   arena trust https://<domain>
+   arena signup
+   # With a public certificate, skip trust and use:
+   # arena signup https://<domain>
    ```
 
-   Alternatively, create the account at `http://<host>:<port>/join`, then run
-   `arena login http://<host>:<port>`.
+   `arena trust` prints the CA fingerprint, asks for confirmation, and saves
+   trust for this server in the CLI config. The projector browser needs the same
+   CA installed in its operating-system trust store; the CLI itself needs no
+   further setup. Both the server and account are remembered, so every later
+   command omits the address.
+
+   Alternatively, create the account at `https://<domain>/join`, then run
+   `arena login https://<domain>`.
 
 3. Inspect the round and submit a first Python solution:
 
@@ -54,7 +63,7 @@ use a `#!` script such as Python.
    import sys
 
    numbers = map(int, sys.stdin.buffer.read().split())
-    next(numbers)
+   next(numbers)
    print(sum(numbers))
    PY
    arena submit sum solution.py --src solution.py
@@ -68,27 +77,34 @@ use a `#!` script such as Python.
 ## Hosting a contest
 
 Requirements: a Linux host with cgroup v2 (any current distribution), Docker
-with Compose. The judge container runs **privileged**; read
+with Compose, a DNS name pointing at the host, and ports 80 and 443 reachable
+from participants. The judge container runs **privileged**; read
 [SECURITY.md](SECURITY.md) first.
 
 ```sh
 git clone https://github.com/hugoocoto/runtime-arena
 cd runtime-arena
-cp .env.example .env      # set ARENA_ADMIN_TOKEN (openssl rand -hex 32), ARENA_JOIN_CODE, JUDGE_CPUS
+cp .env.example .env      # set ARENA_ADMIN_TOKEN, ARENA_JOIN_CODE, ARENA_DOMAIN, JUDGE_CPUS
 chmod 600 .env
 scripts/host-preflight.sh
-docker compose up -d
+scripts/deploy.sh
 ```
 
-`ARENA_PORT` controls the host port exposed by Compose. It defaults to `8080`.
-Open `http://<host>:<port>/` on the projector, and announce
-`http://<host>:<port>/join` and the event code (`ARENA_JOIN_CODE`): participants
+Compose starts a small Caddy proxy alongside the judge. It obtains and renews a
+public certificate automatically with Let's Encrypt. `ARENA_DOMAIN` must resolve
+to this host, and ports 80 and 443 must be open. For a private rehearsal,
+`ARENA_DOMAIN=localhost` uses Caddy's local CA instead. The organiser's CLI keeps
+using `http://localhost:${ARENA_PORT}` through the local-only port; participants
+use `https://<domain>`.
+
+Open `https://<domain>/` on the projector, and announce
+`https://<domain>/join` and the event code (`ARENA_JOIN_CODE`): participants
 create their own accounts there or with `arena signup`. Then, with the `arena` CLI
 ([install it](#installing-the-cli)):
 
 ```sh
 arena login --admin                           # from this directory: reads the token and server from .env
-# from another machine, set ARENA_SERVER=http://<host>:<port> and ARENA_ADMIN_TOKEN in its .env or environment
+# from another machine, set ARENA_SERVER=https://<domain> and ARENA_ADMIN_TOKEN in its .env or environment
 arena admin problem add problems/sum          # a directory: problem.toml, statement.md, tests/
 arena admin round create --name "Round 1" --minutes 60 --freeze 10 sum
 arena admin round start 1
@@ -98,8 +114,14 @@ arena admin user reset-password alice         # forgotten password: prints a new
 
 The server checks GitHub for a newer release at startup and every 6 hours. It
 only notifies you, in its logs, after `arena login --admin`, and with
-`arena admin update`; to update, run `docker compose pull && docker compose up -d`.
+`arena admin update`; to update, change `ARENA_VERSION` in `.env`, then run
+`scripts/deploy.sh`.
 Set `ARENA_UPDATE_CHECK=off` in `.env` to disable the check.
+
+Check the deployment from a second machine with `curl https://<domain>/healthz`.
+Before an event, make a consistent data backup with
+`scripts/backup.sh /path/to/backups`; it briefly stops judging while the SQLite
+database and submissions are archived. Keep backups off the judge host.
 
 Each network address is limited to 10 failed logins per account and 100 failed
 logins or wrong event codes per 15 minutes, 300 new accounts per 15 minutes, 200
@@ -125,7 +147,7 @@ token by token. See `problems/sum` (run `problems/sum/gen.py` for its large test
 Before the event, run a mock contest (20 participants submitting at once):
 
 ```sh
-ARENA_SERVER=http://localhost:<port> ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh
+ARENA_SERVER=https://<domain> ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh
 ```
 
 ### Stable timings
@@ -180,17 +202,19 @@ On Windows, `arena completions powershell` prints its completions.
 For the shortest path, follow the [Participant quickstart](#participant-quickstart).
 This section covers the participant commands in more detail. If you have not
 joined yet, create an account with the event code at
-`http://<host>:<port>/join` or with `arena signup`.
+`https://<domain>/join` or with `arena signup`.
 
 ```sh
-arena round                         # problems and time left
-arena problem sum --samples samples # statement; samples saved as samples/01.in ...
-arena board                         # live boards, time × memory chart, ranks over time
+arena trust https://<domain>          # LAN HTTPS only, once
+arena signup                         # once; remembers the server and account
+arena round                          # problems and time left
+arena problem sum --samples samples  # statement and samples
+arena board                          # live boards and charts
 ```
 
-Log in on another machine with `arena login <host>:<port>`, and end the session on
-this one with `arena logout`. Your password is only sent when logging in: the CLI
-keeps a per-device token instead. In scripts, use `--username` and
+Log in once on another machine with `arena login https://<domain>`, then use
+`arena logout` to end the session on this one. Your password is only sent when
+logging in: the CLI keeps a per-device token instead. In scripts, use `--username` and
 `--password-stdin`, and `--json` on read commands. Exit codes are listed in
 `man arena`.
 

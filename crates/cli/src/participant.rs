@@ -36,7 +36,55 @@ pub fn participant(config: &Config) -> Result<Client> {
                 .into(),
         )
     })?;
-    Client::new(config.server()?, Some(token))
+    Client::with_ca(
+        config.server()?,
+        Some(token),
+        config.ca_certificate.as_deref(),
+    )
+}
+
+fn trust_server(server: &str) -> Result<String> {
+    let server = server.trim().trim_end_matches('/');
+    if server.is_empty() {
+        bail!("no server address given");
+    }
+    let server = if server.starts_with("https://") {
+        server.to_owned()
+    } else if server.starts_with("http://") {
+        bail!("LAN trust needs the final HTTPS address, for example https://192.168.1.42");
+    } else {
+        format!("https://{server}")
+    };
+    Ok(crate::client::normalise_server(&server))
+}
+
+/// Downloads and saves the CA used by a LAN Caddy deployment.
+pub async fn trust(server: Option<&str>, yes: bool) -> Result<()> {
+    let server = match server {
+        Some(server) => trust_server(server)?,
+        None => {
+            let server: String = ask::required("HTTPS server", "<SERVER>", None)?;
+            trust_server(&server)?
+        }
+    };
+    let certificate = Client::download_ca(&server).await?;
+    let fingerprint = Client::certificate_fingerprint(&certificate);
+    println!("LAN CA SHA-256 fingerprint: {fingerprint}");
+    if !yes {
+        let answer: String = ask::required("Trust this certificate? Type yes", "--yes", None)?;
+        if answer != "yes" {
+            bail!("certificate not trusted");
+        }
+    }
+    let mut config = Config::load_file()?;
+    config.set_server(&server);
+    config.ca_certificate = Some(String::from_utf8(certificate)?);
+    let path = config.save()?;
+    println!(
+        "Trusted LAN certificate for {server} in {}.",
+        path.display()
+    );
+    Ok(())
 }
 
 /// The given server, else the remembered one.
@@ -45,7 +93,7 @@ fn target_server(server: Option<&str>, command: &str) -> Result<String> {
         Some(s) => Ok(crate::client::normalise_server(s)),
         None => Config::load()?.server.ok_or_else(|| {
             UsageError(format!(
-                "give the server address, e.g. `arena {command} arena.local:8080`"
+                "give the server address, e.g. `arena {command} https://arena.local`"
             ))
             .into()
         }),
@@ -79,10 +127,14 @@ fn read_password(from_stdin: bool, confirm: bool) -> Result<String> {
 /// Exchanges name and password for a device token and saves it.
 async fn log_in(server: &str, name: String, password: String) -> Result<()> {
     let mut config = Config::load_file()?;
-    let t: UserToken = Client::new(server, None)?
+    let t: UserToken = Client::with_ca(server, None, config.ca_certificate.as_deref())?
         .post("/api/login", &LoginRequest { name, password })
         .await?;
-    let client = Client::new(server, Some(t.token.clone()))?;
+    let client = Client::with_ca(
+        server,
+        Some(t.token.clone()),
+        config.ca_certificate.as_deref(),
+    )?;
     let me: UserInfo = client.get("/api/me").await?;
     config.set_server(server);
     config.token = Some(t.token);
@@ -116,7 +168,11 @@ pub async fn signup(
     let name: String = ask::required("Username", "--username", username)?;
     let join_code: String = ask::required("Event code", "--join-code", join_code)?;
     let password = read_password(password_stdin, true)?;
-    let created: UserInfo = Client::new(&server, None)?
+    let saved = Config::load_file()?;
+    let ca = (saved.server.as_deref().map(crate::client::normalise_server) == Some(server.clone()))
+        .then_some(saved.ca_certificate)
+        .flatten();
+    let created: UserInfo = Client::with_ca(&server, None, ca.as_deref())?
         .post(
             "/api/signup",
             &SignupRequest {
@@ -148,7 +204,7 @@ pub async fn logout(admin: bool) -> Result<()> {
         return Ok(());
     };
     let ended = match config.server.as_deref() {
-        Some(server) => Client::new(server, Some(token))?
+        Some(server) => Client::with_ca(server, Some(token), config.ca_certificate.as_deref())?
             .post_empty("/api/logout")
             .await
             .map_err(|e| (status_of(&e), e)),
@@ -180,7 +236,11 @@ pub async fn admin_login() -> Result<()> {
     if server.starts_with("http://") && !is_loopback(&server) {
         eprintln!("warning: sending the admin token to {server} without encryption (http)");
     }
-    let client = Client::new(&server, Some(token.clone()))?;
+    let client = Client::with_ca(
+        &server,
+        Some(token.clone()),
+        config.ca_certificate.as_deref(),
+    )?;
     client
         .get::<Vec<UserInfo>>("/api/admin/users")
         .await
@@ -326,7 +386,11 @@ pub fn print_round(round: &RoundInfo) {
 }
 
 pub async fn round(config: &Config, json: bool) -> Result<()> {
-    let client = Client::new(config.server()?, config.token.clone())?;
+    let client = Client::with_ca(
+        config.server()?,
+        config.token.clone(),
+        config.ca_certificate.as_deref(),
+    )?;
     let round: RoundInfo = client.get("/api/rounds/current").await?;
     if json {
         return format::print_json(&round);

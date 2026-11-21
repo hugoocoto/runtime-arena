@@ -1,5 +1,6 @@
 /target
 /data
+/backups
 .env
 /tests/sandbox/out
 /problems/sum/tests/03.*

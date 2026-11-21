@@ -40,9 +40,12 @@ runtime-arena/
 └── problems/         example problem directories
 ```
 
-- **Deployment**: `docker compose up` with a privileged container and a private
-  cgroup namespace; the entrypoint sets up the cgroup tree for isolate
-  (`docker/entrypoint.sh`). Verified on cgroup v2 (kernel 7.2) on 2026-11-20.
+- **Deployment**: `scripts/deploy.sh` starts the privileged judge container and a
+  small Caddy HTTPS proxy through Docker Compose. Caddy obtains and renews the
+  certificate for `ARENA_DOMAIN`; the judge API remains bound to localhost and
+  the internal Compose network. The entrypoint sets up the cgroup tree for
+  isolate (`docker/entrypoint.sh`). Verified on cgroup v2 (kernel 7.2) on
+  2026-11-20.
 - **Repo**: github.com/hugoocoto/runtime-arena, AGPL-3.0-or-later, branch `main`.
 - **CI/CD**: GitHub Actions (pinned by SHA): fmt, clippy, tests, cargo-deny, CLI
   builds on macOS/Windows, sandbox verdict test in compose. release-please on
@@ -148,7 +151,8 @@ Uploaded with `arena admin problem add <dir>`.
 ## CLI
 
 ```
-arena signup [server] [-u NAME] [--join-code CODE] [--password-stdin]
+ arena trust [server] [--yes]
+ arena signup [server] [-u NAME] [--join-code CODE] [--password-stdin]
 arena login [server] [-u NAME] [--password-stdin]
 arena logout [--admin]
 arena login --admin                       # ARENA_ADMIN_TOKEN, ARENA_SERVER from env or ./.env

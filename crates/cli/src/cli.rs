@@ -16,9 +16,17 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Trust the LAN CA served by a local HTTPS deployment.
+    Trust {
+        /// e.g. https://192.168.1.42 (remembered afterwards)
+        server: Option<String>,
+        /// Skip the interactive fingerprint confirmation.
+        #[arg(short, long)]
+        yes: bool,
+    },
     /// Create an account with the organiser's event code and log in.
     Signup {
-        /// e.g. arena.local:8080 (remembered afterwards)
+        /// e.g. https://arena.local (remembered afterwards)
         server: Option<String>,
         #[arg(short, long)]
         username: Option<String>,
@@ -34,7 +42,7 @@ pub enum Command {
     },
     /// Log in with your username and password.
     Login {
-        /// e.g. arena.local:8080 (remembered after the first login)
+        /// e.g. https://arena.local (remembered after the first login)
         server: Option<String>,
         #[arg(short, long, conflicts_with = "admin")]
         username: Option<String>,

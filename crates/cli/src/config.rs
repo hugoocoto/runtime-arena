@@ -17,6 +17,9 @@ pub struct Config {
     pub server: Option<String>,
     pub token: Option<String>,
     pub admin_token: Option<String>,
+    /// PEM-encoded CA trusted for the remembered server, used for LAN HTTPS.
+    #[serde(default)]
+    pub ca_certificate: Option<String>,
 }
 
 pub fn path() -> Result<PathBuf> {
@@ -51,6 +54,7 @@ impl Config {
         if self.server.as_deref().map(normalise_server).as_deref() != Some(server.as_str()) {
             self.token = None;
             self.admin_token = None;
+            self.ca_certificate = None;
         }
         self.server = Some(server);
     }
@@ -166,6 +170,7 @@ mod tests {
             server: Some("http://a:8080".into()),
             token: Some("user".into()),
             admin_token: Some("admin".into()),
+            ca_certificate: None,
         }
     }
 

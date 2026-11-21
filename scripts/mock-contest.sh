@@ -3,7 +3,7 @@
 # uploads problems/sum, creates participants, starts a round, and has every
 # participant submit several solutions at the same time.
 #
-#   ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh [users] [rounds-of-submissions]
+#   ARENA_SERVER=https://arena.example.com ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh [users] [rounds-of-submissions]
 #
 # Needs Docker (to build the solutions in the build-env image) and cargo.
 set -euo pipefail

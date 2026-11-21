@@ -4,8 +4,10 @@ use anyhow::{Context, Result, bail};
 use arena_protocol::{ApiError, ServerEvent, ServerInfo};
 use futures_util::StreamExt;
 use reqwest::{Method, RequestBuilder, Response, StatusCode};
+use rustls::RootCertStore;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use sha2::{Digest, Sha256};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
@@ -14,6 +16,7 @@ pub struct Client {
     http: reqwest::Client,
     base: String,
     token: Option<String>,
+    ca_certificate: Option<Vec<u8>>,
 }
 
 /// A request that failed, kept typed so the CLI can pick a hint and an exit code.
@@ -111,15 +114,70 @@ pub fn normalise_server(server: &str) -> String {
 
 impl Client {
     pub fn new(server: &str, token: Option<String>) -> Result<Client> {
+        Self::with_ca(server, token, None)
+    }
+
+    pub fn with_ca(
+        server: &str,
+        token: Option<String>,
+        ca_certificate: Option<&str>,
+    ) -> Result<Client> {
         init_tls();
         let base = normalise_server(server);
         if base.is_empty() {
             bail!("no server address given");
         }
-        let http = reqwest::Client::builder()
-            .user_agent(concat!("arena-cli/", env!("CARGO_PKG_VERSION")))
-            .build()?;
-        Ok(Client { http, base, token })
+        let mut builder =
+            reqwest::Client::builder().user_agent(concat!("arena-cli/", env!("CARGO_PKG_VERSION")));
+        if let Some(ca) = ca_certificate {
+            builder = builder.add_root_certificate(reqwest::Certificate::from_pem(ca.as_bytes())?);
+        }
+        let http = builder.build()?;
+        Ok(Client {
+            http,
+            base,
+            token,
+            ca_certificate: ca_certificate.map(str::as_bytes).map(ToOwned::to_owned),
+        })
+    }
+
+    /// Downloads the LAN CA over the unauthenticated HTTP bootstrap endpoint.
+    /// The caller must show and, unless explicitly overridden, confirm the
+    /// fingerprint before saving it.
+    pub async fn download_ca(server: &str) -> Result<Vec<u8>> {
+        init_tls();
+        let base = normalise_server(server);
+        let bootstrap = base
+            .strip_prefix("https://")
+            .map_or_else(|| base.clone(), |rest| format!("http://{rest}"));
+        let response = reqwest::Client::new()
+            .get(format!("{bootstrap}/arena-ca.crt"))
+            .send()
+            .await
+            .with_context(|| format!("could not download the LAN certificate from {bootstrap}"))?;
+        if !response.status().is_success() {
+            bail!(
+                "the server did not offer a LAN certificate at {bootstrap}/arena-ca.crt (HTTP {})",
+                response.status()
+            );
+        }
+        let bytes = response.bytes().await?.to_vec();
+        if !bytes
+            .windows(b"-----BEGIN CERTIFICATE-----".len())
+            .any(|window| window == b"-----BEGIN CERTIFICATE-----")
+        {
+            bail!("the server returned an invalid CA certificate");
+        }
+        Ok(bytes)
+    }
+
+    pub fn certificate_fingerprint(certificate: &[u8]) -> String {
+        let digest = Sha256::digest(certificate);
+        digest
+            .iter()
+            .map(|byte| format!("{byte:02X}"))
+            .collect::<Vec<_>>()
+            .join(":")
     }
 
     pub fn base(&self) -> &str {
@@ -239,10 +297,28 @@ impl Client {
             req.headers_mut()
                 .insert("authorization", format!("Bearer {t}").parse()?);
         }
-        let (ws, _) = tokio_tungstenite::connect_async(req)
+        let connector = self.websocket_connector()?;
+        let (ws, _) = tokio_tungstenite::connect_async_tls_with_config(req, None, false, connector)
             .await
             .context("cannot open the live connection")?;
         Ok(EventStream { ws })
+    }
+
+    fn websocket_connector(&self) -> Result<Option<tokio_tungstenite::Connector>> {
+        let Some(ca) = &self.ca_certificate else {
+            return Ok(None);
+        };
+        let mut roots = RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        let mut reader = std::io::Cursor::new(ca);
+        for certificate in rustls_pemfile::certs(&mut reader) {
+            roots.add(certificate?)?;
+        }
+        let config = rustls::ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        Ok(Some(tokio_tungstenite::Connector::Rustls(
+            std::sync::Arc::new(config),
+        )))
     }
 }
 

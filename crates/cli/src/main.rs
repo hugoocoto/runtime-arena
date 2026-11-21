@@ -19,6 +19,10 @@ async fn main() -> ExitCode {
 async fn run(cli: Cli) -> Result<bool> {
     // These work without a saved configuration.
     let command = match cli.command {
+        Command::Trust { server, yes } => {
+            participant::trust(server.as_deref(), yes).await?;
+            return Ok(true);
+        }
         Command::Signup {
             server,
             username,
@@ -66,6 +70,7 @@ async fn run(cli: Cli) -> Result<bool> {
     let config = Config::load()?;
     match command {
         Command::Signup { .. }
+        | Command::Trust { .. }
         | Command::Login { .. }
         | Command::Logout { .. }
         | Command::Completions { .. }
@@ -94,7 +99,11 @@ async fn run(cli: Cli) -> Result<bool> {
         }
         Command::Submissions { id, json } => participant::submissions(&config, id, json).await?,
         Command::Board => {
-            let client = Client::new(config.server()?, config.token.clone())?;
+            let client = Client::with_ca(
+                config.server()?,
+                config.token.clone(),
+                config.ca_certificate.as_deref(),
+            )?;
             board::run(client, config.token.is_some()).await?
         }
         Command::Admin { command } => {
