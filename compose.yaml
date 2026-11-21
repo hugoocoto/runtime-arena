@@ -16,6 +16,7 @@ services:
       ARENA_ADMIN_TOKEN: ${ARENA_ADMIN_TOKEN:?set ARENA_ADMIN_TOKEN in .env (openssl rand -hex 32)}
       ARENA_JOIN_CODE: ${ARENA_JOIN_CODE:-}
       JUDGE_CPUS: ${JUDGE_CPUS:-}
+      ARENA_UPDATE_CHECK: ${ARENA_UPDATE_CHECK:-on}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - arena-data:/data

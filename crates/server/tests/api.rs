@@ -21,6 +21,18 @@ async fn admin_endpoints_require_the_admin_token() {
 }
 
 #[tokio::test]
+async fn update_status_is_admin_only() {
+    let s = TestServer::new().await;
+    let (status, _) = s.get("/api/admin/update", None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, body) = s.get("/api/admin/update", Some(ADMIN)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["current"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(body["latest"], serde_json::Value::Null);
+    assert_eq!(body["update_available"], false);
+}
+
+#[tokio::test]
 async fn participant_token_works_and_can_be_reset() {
     let s = TestServer::new().await;
     let (status, body) = s

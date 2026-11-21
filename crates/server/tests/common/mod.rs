@@ -45,6 +45,7 @@ impl TestServer {
             judge_boxes: vec![0],
             isolate: "isolate".into(),
             runs_per_test: 1,
+            update_check: false,
         };
         change(&mut config);
         let db = open_db(&config.data_dir).await.unwrap();

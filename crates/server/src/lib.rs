@@ -10,11 +10,12 @@ mod problems;
 mod queue;
 mod rounds;
 mod submissions;
+mod updates;
 mod users;
 mod ws;
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arena_protocol::{ServerEvent, ServerInfo};
@@ -52,6 +53,8 @@ pub struct AppState {
     submit_lock: Arc<Mutex<()>>,
     /// Serialises problem uploads (version numbers, lock check).
     upload_lock: Arc<Mutex<()>>,
+    /// Latest published release, once an update check has succeeded.
+    latest_version: Arc<RwLock<Option<String>>>,
 }
 
 impl AppState {
@@ -64,6 +67,7 @@ impl AppState {
             queue: Arc::new(Notify::new()),
             submit_lock: Arc::new(Mutex::new(())),
             upload_lock: Arc::new(Mutex::new(())),
+            latest_version: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -93,11 +97,15 @@ pub async fn start_background(state: &AppState) -> Result<(), sqlx::Error> {
         tokio::spawn(queue::worker(state.clone(), box_id));
     }
     tokio::spawn(rounds::clock(state.clone()));
+    if state.config.update_check {
+        tokio::spawn(updates::clock(state.clone()));
+    }
     Ok(())
 }
 
 pub fn app(state: AppState) -> Router {
     let admin = Router::new()
+        .route("/update", get(updates::status))
         .route("/users", get(users::list).post(users::create))
         .route("/users/{name}/token", post(users::reset_token))
         .route("/problems", get(problems::list))

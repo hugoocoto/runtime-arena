@@ -30,48 +30,29 @@ pub fn participant(config: &Config) -> Result<Client> {
     let token = config
         .token
         .clone()
-        .context("not logged in; run `arena login <server> <token>`")?;
+        .context("not logged in; run `arena login <server>`")?;
     Client::new(config.server()?, Some(token))
 }
 
 /// Saves the server and a token. Without a token, asks for the username and
 /// password of the account created on the server's `/join` page.
-pub async fn login(server: Option<&str>, token: Option<&str>, admin: bool) -> Result<()> {
+pub async fn login(server: Option<&str>, token: Option<&str>) -> Result<()> {
     let mut config = Config::load_file()?;
-    if admin {
-        let file = crate::config::dotenv()?;
-        let (server, token) = admin_target(
-            server,
-            token,
-            config.server.as_deref(),
-            |k| std::env::var(k).ok().filter(|v| !v.is_empty()),
-            |k| file.get(k).cloned(),
-        )?;
-        Client::new(&server, Some(token.clone()))?
-            .get::<Vec<UserInfo>>("/api/admin/users")
-            .await
-            .with_context(|| format!("could not verify the admin token on {server}"))?;
-        config.admin_token = Some(token);
-        println!("Admin token verified on {server}.");
-        config.server = Some(server);
-        config.save()?;
-        return Ok(());
-    }
     let server = match server {
         Some(s) => crate::client::normalise_server(s),
         None => Config::load()?
             .server
             .context("give the server address, e.g. `arena login http://arena.local:8080`")?,
     };
-    match token {
+    let token = match token {
         Some(token) => {
             let client = Client::new(&server, Some(token.to_owned()))?;
             let me: UserInfo = client
                 .get("/api/me")
                 .await
                 .context("the token was refused")?;
-            config.token = Some(token.to_owned());
             println!("Logged in as {} ({}).", me.display_name, me.name);
+            token.to_owned()
         }
         None => {
             let name = prompt("Username: ")?;
@@ -86,53 +67,96 @@ pub async fn login(server: Option<&str>, token: Option<&str>, admin: bool) -> Re
             let me: UserInfo = Client::new(&server, Some(t.token.clone()))?
                 .get("/api/me")
                 .await?;
-            config.token = Some(t.token);
             println!("Logged in as {} ({}).", me.display_name, me.name);
+            t.token
         }
-    }
-    config.server = Some(server);
+    };
+    config.set_server(&server);
+    config.token = Some(token);
     config.save()?;
     Ok(())
 }
 
-/// Picks the server and token for `login --admin`. A `.env` marks this machine
-/// as the host, so the server defaults to localhost on `ARENA_PORT`. A token
-/// read from `.env` is only ever sent to a loopback address.
+/// Saves the admin token, taken only from the environment or `./.env`, so it
+/// never appears in the command line or the shell history.
+pub async fn admin_login() -> Result<()> {
+    let mut config = Config::load_file()?;
+    let file = crate::config::dotenv()?;
+    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let (server, token) = admin_target(env, |k| file.get(k).cloned())?;
+    if env("ARENA_ADMIN_TOKEN").is_none() {
+        crate::config::warn_if_dotenv_shared();
+    }
+    if server.starts_with("http://") && !is_loopback(&server) {
+        eprintln!("warning: sending the admin token to {server} without encryption (http)");
+    }
+    let client = Client::new(&server, Some(token.clone()))?;
+    client
+        .get::<Vec<UserInfo>>("/api/admin/users")
+        .await
+        .with_context(|| format!("could not verify the admin token on {server}"))?;
+    config.set_server(&server);
+    config.admin_token = Some(token);
+    config.save()?;
+    println!("Admin token verified on {server}.");
+    crate::admin::notify_update(&client).await;
+    Ok(())
+}
+
+/// Picks the server and token for `login --admin`. Both come from the same
+/// place (environment, else `.env`), so a `.env` can't redirect an exported
+/// token, nor the environment a `.env` token. With no server, uses localhost.
 fn admin_target(
-    server: Option<&str>,
-    token: Option<&str>,
-    saved_server: Option<&str>,
     env: impl Fn(&str) -> Option<String>,
     dotenv: impl Fn(&str) -> Option<String>,
 ) -> Result<(String, String)> {
-    let env_token = env("ARENA_ADMIN_TOKEN");
-    let file_token = dotenv("ARENA_ADMIN_TOKEN");
-    let server = match server.map(str::to_owned).or_else(|| env("ARENA_SERVER")) {
-        Some(s) => crate::client::normalise_server(&s),
-        None if file_token.is_some() => local_server(&env, &dotenv)?,
-        None => match saved_server {
-            Some(s) => s.to_owned(),
-            None if token.is_some() || env_token.is_some() => local_server(&env, &dotenv)?,
-            None => bail!(
-                "no admin token found: set ARENA_ADMIN_TOKEN, run from the directory with \
-                 the host's .env, or use `arena login --admin <server> <token>`"
-            ),
-        },
+    if let Some(token) = env("ARENA_ADMIN_TOKEN") {
+        let server = match env("ARENA_SERVER") {
+            Some(s) => checked_server(&s)?,
+            None => local_server(&env, &dotenv)?,
+        };
+        return Ok((server, token));
+    }
+    let token = dotenv("ARENA_ADMIN_TOKEN").context(
+        "no admin token found: set ARENA_ADMIN_TOKEN (and ARENA_SERVER for a remote server) \
+         in the environment or in ./.env",
+    )?;
+    let server = match dotenv("ARENA_SERVER") {
+        Some(s) => checked_server(&s)?,
+        None => local_server(&env, &dotenv)?,
     };
-    let token = token.map(str::to_owned).or(env_token);
-    let token = match (token, file_token) {
-        (Some(t), _) => t,
-        (None, Some(t)) if is_loopback(&server) => t,
-        (None, Some(_)) => bail!(
-            "not sending the token from .env to {server}, which is not this machine; \
-             use `arena login --admin <server> <token>`"
-        ),
-        (None, None) => bail!(
-            "no admin token found: set ARENA_ADMIN_TOKEN, run from the directory with \
-             the host's .env, or use `arena login --admin <server> <token>`"
-        ),
-    };
+    if let Some(s) = env("ARENA_SERVER")
+        && checked_server(&s)? != server
+    {
+        bail!(
+            "ARENA_SERVER in the environment differs from the server for the token in .env; \
+             set ARENA_SERVER and ARENA_ADMIN_TOKEN in the same place"
+        );
+    }
     Ok((server, token))
+}
+
+/// A normalised http(s) URL. Errors never echo the value, which may be a secret.
+fn checked_server(server: &str) -> Result<String> {
+    // Checked first: normalising would turn `ftp://x` into `http://ftp://x`.
+    if let Some((scheme, _)) = server.trim().split_once("://")
+        && !matches!(scheme.to_ascii_lowercase().as_str(), "http" | "https")
+    {
+        bail!("ARENA_SERVER must be an http(s) URL");
+    }
+    let server = crate::client::normalise_server(server);
+    let url = reqwest::Url::parse(&server)
+        .map_err(|_| anyhow::anyhow!("ARENA_SERVER is not a valid URL"))?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        bail!("ARENA_SERVER must be an http(s) URL");
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        bail!("ARENA_SERVER must not contain credentials");
+    }
+    if url.query().is_some() || url.fragment().is_some() {
+        bail!("ARENA_SERVER must not have a query or fragment");
+    }
+    Ok(server)
 }
 
 fn local_server(
@@ -502,69 +526,65 @@ mod tests {
     #[test]
     fn admin_login_on_the_host_uses_dotenv() {
         let file = [("ARENA_ADMIN_TOKEN", "secret"), ("ARENA_PORT", "9000")];
-        let got = admin_target(
-            None,
-            None,
-            Some("http://remote:8080"),
-            vars(&[]),
-            vars(&file),
-        );
-        assert_eq!(
-            got.unwrap(),
-            ("http://localhost:9000".to_owned(), "secret".to_owned())
-        );
+        let got = admin_target(vars(&[]), vars(&file)).unwrap();
+        assert_eq!(got, ("http://localhost:9000".into(), "secret".into()));
     }
 
     #[test]
-    fn admin_login_environment_beats_dotenv() {
-        let env = [("ARENA_ADMIN_TOKEN", "from-env"), ("ARENA_PORT", "7000")];
-        let file = [("ARENA_ADMIN_TOKEN", "from-file"), ("ARENA_PORT", "9000")];
-        let got = admin_target(None, None, None, vars(&env), vars(&file)).unwrap();
-        assert_eq!(got, ("http://localhost:7000".into(), "from-env".into()));
+    fn admin_login_reads_a_remote_server_from_dotenv() {
+        let file = [
+            ("ARENA_ADMIN_TOKEN", "secret"),
+            ("ARENA_SERVER", "arena.example:8080/"),
+        ];
+        let got = admin_target(vars(&[]), vars(&file)).unwrap();
+        assert_eq!(got, ("http://arena.example:8080".into(), "secret".into()));
     }
 
     #[test]
-    fn admin_login_without_dotenv_keeps_saved_server() {
-        let env = [("ARENA_ADMIN_TOKEN", "t")];
-        let got = admin_target(
-            None,
-            None,
-            Some("http://remote:8080"),
-            vars(&env),
-            vars(&[]),
-        );
-        assert_eq!(got.unwrap().0, "http://remote:8080");
+    fn admin_login_reads_server_and_token_from_environment() {
+        let env = [
+            ("ARENA_ADMIN_TOKEN", "from-env"),
+            ("ARENA_SERVER", "https://arena.example"),
+        ];
+        let file = [("ARENA_ADMIN_TOKEN", "from-file")];
+        let got = admin_target(vars(&env), vars(&file)).unwrap();
+        assert_eq!(got, ("https://arena.example".into(), "from-env".into()));
     }
 
     #[test]
-    fn dotenv_token_never_goes_to_a_remote_server() {
+    fn dotenv_cannot_redirect_an_exported_token() {
+        let env = [("ARENA_ADMIN_TOKEN", "from-env")];
+        let file = [("ARENA_SERVER", "http://evil.example:8080")];
+        let got = admin_target(vars(&env), vars(&file)).unwrap();
+        assert_eq!(got, ("http://localhost:8080".into(), "from-env".into()));
+    }
+
+    #[test]
+    fn environment_cannot_redirect_a_dotenv_token() {
+        let env = [("ARENA_SERVER", "http://evil.example:8080")];
         let file = [("ARENA_ADMIN_TOKEN", "secret")];
-        assert!(
-            admin_target(
-                Some("arena.example:8080"),
-                None,
-                None,
-                vars(&[]),
-                vars(&file)
-            )
-            .is_err()
-        );
-        let env = [("ARENA_SERVER", "http://arena.example:8080")];
-        assert!(admin_target(None, None, None, vars(&env), vars(&file)).is_err());
-        assert!(admin_target(Some("127.0.0.1:8080"), None, None, vars(&[]), vars(&file)).is_ok());
-        assert!(admin_target(Some("[::1]:8080"), None, None, vars(&[]), vars(&file)).is_ok());
-        assert!(!is_loopback("http://localhost.example:8080"));
+        assert!(admin_target(vars(&env), vars(&file)).is_err());
+        let env = [("ARENA_SERVER", "http://localhost:8080")];
+        assert!(admin_target(vars(&env), vars(&file)).is_ok());
     }
 
     #[test]
-    fn admin_login_with_only_a_token_defaults_to_localhost() {
-        let got = admin_target(None, Some("t"), None, vars(&[]), vars(&[])).unwrap();
-        assert_eq!(got, ("http://localhost:8080".into(), "t".into()));
+    fn server_urls_are_checked_without_echoing_them() {
+        for bad in [
+            "http://user:hunter2@arena.example",
+            "http://arena.example?x=hunter2",
+            "ftp://hunter2",
+        ] {
+            let err = format!("{:#}", checked_server(bad).map(|_| ()).unwrap_err());
+            assert!(!err.contains("hunter2"), "{err}");
+        }
+        assert!(!is_loopback("http://localhost.example:8080"));
+        assert!(is_loopback("http://[::1]:8080"));
     }
 
     #[test]
     fn admin_login_without_a_token_fails() {
-        assert!(admin_target(None, None, Some("http://r:1"), vars(&[]), vars(&[])).is_err());
+        assert!(admin_target(vars(&[]), vars(&[])).is_err());
     }
 
     #[test]

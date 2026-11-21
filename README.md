@@ -22,6 +22,7 @@ with Compose. The judge container runs **privileged**; read
 git clone https://github.com/hugoocoto/runtime-arena
 cd runtime-arena
 cp .env.example .env      # set ARENA_ADMIN_TOKEN (openssl rand -hex 32), ARENA_JOIN_CODE, JUDGE_CPUS
+chmod 600 .env
 docker compose up -d
 ```
 
@@ -31,14 +32,22 @@ there. Then, with the `arena` CLI (download the executable for your platform
 from the [releases](https://github.com/hugoocoto/runtime-arena/releases)):
 
 ```sh
-arena login --admin                           # on the host, from this directory (reads .env)
-# from another machine: arena login --admin http://<host>:8080 <ARENA_ADMIN_TOKEN>
+arena login --admin                           # from this directory: reads the token and server from .env
+# from another machine, set ARENA_SERVER=http://<host>:8080 and ARENA_ADMIN_TOKEN in its .env or environment
 arena admin problem add problems/sum          # a directory: problem.toml, statement.md, tests/
 arena admin user add alice --display-name "Alice"   # optional: an account made by you; prints its token once
 arena admin round create --name "Round 1" --minutes 60 --freeze 10 sum
 arena admin round start 1
 arena admin submissions                       # review; `arena admin source <id>` downloads code
 ```
+
+The server checks GitHub for a newer release at startup and every 6 hours. It
+only notifies you, in its logs, after `arena login --admin`, and with
+`arena admin update`; to update, run `docker compose pull && docker compose up -d`.
+Set `ARENA_UPDATE_CHECK=off` in `.env` to disable the check.
+
+In a terminal, any argument you leave out is asked for, so `arena admin round create`
+alone walks you through it. In scripts a missing argument is an error.
 
 A problem directory:
 

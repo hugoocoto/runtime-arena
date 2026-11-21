@@ -2,11 +2,12 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use anyhow::Result;
-use arena_cli::{admin, board, client::Client, config::Config, participant};
+use arena_cli::{admin, ask, board, client::Client, config::Config, participant};
 use arena_protocol::CreateRound;
 use clap::{Parser, Subcommand};
 
 /// Runtime Arena: submit solutions and follow the contest from your terminal.
+/// In a terminal, arguments you leave out are asked for.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
@@ -16,17 +17,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Save the server and your token (from the organiser).
     /// Log in: asks for the username and password you created on the server's
-    /// /join page. Organisers can pass a token instead.
+    /// /join page, or takes a token from the organiser.
     Login {
         /// e.g. arena.local:8080 (remembered after the first login)
         server: Option<String>,
         /// A token from the organiser, instead of username and password.
         token: Option<String>,
-        /// Save the token as the admin token. On the host, run from the directory
-        /// with .env to default to localhost:ARENA_PORT and ARENA_ADMIN_TOKEN.
-        #[arg(long)]
+        /// Log in as admin. Takes no arguments: reads ARENA_ADMIN_TOKEN and
+        /// ARENA_SERVER (default localhost:ARENA_PORT) from the environment or ./.env.
+        #[arg(long, conflicts_with_all = ["server", "token"])]
         admin: bool,
     },
     /// Show who you are logged in as.
@@ -35,7 +35,7 @@ enum Command {
     Round,
     /// Show a problem's statement and samples.
     Problem {
-        slug: String,
+        slug: Option<String>,
         /// Also write the samples as NAME.in / NAME.out into this directory.
         #[arg(long)]
         samples: Option<PathBuf>,
@@ -50,12 +50,12 @@ enum Command {
     },
     /// Submit an executable and follow its judging.
     Submit {
-        problem: String,
+        problem: Option<String>,
         /// Linux x86-64 executable or #! script.
-        executable: PathBuf,
+        executable: Option<PathBuf>,
         /// Your source code (file or directory); required, kept for review.
         #[arg(long)]
-        src: PathBuf,
+        src: Option<PathBuf>,
         /// Return right after uploading.
         #[arg(long)]
         no_wait: bool,
@@ -86,26 +86,28 @@ enum AdminCommand {
     },
     /// Download a submission's source archive.
     Source {
-        id: i64,
+        id: Option<i64>,
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
     /// Judge a submission again.
-    Rejudge { id: i64 },
+    Rejudge { id: Option<i64> },
+    /// Check whether a newer server release exists.
+    Update,
 }
 
 #[derive(Subcommand)]
 enum UserCommand {
     /// Create a participant and print their token.
     Add {
-        name: String,
+        name: Option<String>,
         #[arg(long)]
         display_name: Option<String>,
     },
     List,
     /// Issue a new token (the old one stops working).
     Reset {
-        name: String,
+        name: Option<String>,
     },
 }
 
@@ -113,7 +115,7 @@ enum UserCommand {
 enum ProblemCommand {
     /// Upload a problem directory (problem.toml, statement.md, tests/).
     Add {
-        dir: PathBuf,
+        dir: Option<PathBuf>,
         /// Defaults to the directory name.
         #[arg(long)]
         slug: Option<String>,
@@ -129,29 +131,28 @@ enum RoundCommand {
     /// Create a round (it starts with `round start`).
     Create {
         #[arg(long)]
-        name: String,
+        name: Option<String>,
         #[arg(long)]
-        minutes: u32,
-        /// Freeze public boards this many minutes before the end.
-        #[arg(long, default_value_t = 0)]
-        freeze: u32,
-        /// Seconds between two submissions of one participant.
-        #[arg(long, default_value_t = 30)]
-        cooldown: u32,
+        minutes: Option<u32>,
+        /// Freeze public boards this many minutes before the end [default: 0].
+        #[arg(long)]
+        freeze: Option<u32>,
+        /// Seconds between two submissions of one participant [default: 30].
+        #[arg(long)]
+        cooldown: Option<u32>,
         /// Problem slugs in display order.
-        #[arg(required = true)]
         problems: Vec<String>,
     },
     List,
     Start {
-        id: i64,
+        id: Option<i64>,
     },
     Stop {
-        id: i64,
+        id: Option<i64>,
     },
     Extend {
-        id: i64,
-        minutes: u32,
+        id: Option<i64>,
+        minutes: Option<u32>,
     },
 }
 
@@ -175,7 +176,11 @@ async fn run(cli: Cli) -> Result<bool> {
         admin,
     } = &cli.command
     {
-        participant::login(server.as_deref(), token.as_deref(), *admin).await?;
+        if *admin {
+            participant::admin_login().await?;
+        } else {
+            participant::login(server.as_deref(), token.as_deref()).await?;
+        }
         return Ok(true);
     }
     let config = Config::load()?;
@@ -184,6 +189,7 @@ async fn run(cli: Cli) -> Result<bool> {
         Command::Whoami => participant::whoami(&config).await?,
         Command::Round => participant::round(&config).await?,
         Command::Problem { slug, samples } => {
+            let slug: String = ask::required("Problem", "<SLUG>", slug)?;
             participant::problem(&config, &slug, samples.as_deref()).await?
         }
         Command::Build { image, command } => return participant::build(&image, &command),
@@ -192,7 +198,12 @@ async fn run(cli: Cli) -> Result<bool> {
             executable,
             src,
             no_wait,
-        } => return participant::submit(&config, &problem, &executable, &src, !no_wait).await,
+        } => {
+            let problem: String = ask::required("Problem", "<PROBLEM>", problem)?;
+            let executable = ask::path("Executable", "<EXECUTABLE>", executable)?;
+            let src = ask::path("Source file or directory", "--src", src)?;
+            return participant::submit(&config, &problem, &executable, &src, !no_wait).await;
+        }
         Command::Submissions { id } => participant::submissions(&config, id).await?,
         Command::Board => {
             let client = Client::new(config.server()?, config.token.clone())?;
@@ -202,13 +213,19 @@ async fn run(cli: Cli) -> Result<bool> {
             let c = admin::admin(&config)?;
             match command {
                 AdminCommand::User(UserCommand::Add { name, display_name }) => {
+                    let name: String = ask::required("Username", "<NAME>", name)?;
                     admin::user_add(&c, &name, display_name).await?
                 }
                 AdminCommand::User(UserCommand::List) => admin::user_list(&c).await?,
                 AdminCommand::User(UserCommand::Reset { name }) => {
+                    if name.is_none() && ask::is_interactive() {
+                        admin::user_list(&c).await?;
+                    }
+                    let name: String = ask::required("Username", "<NAME>", name)?;
                     admin::user_reset(&c, &name).await?
                 }
                 AdminCommand::Problem(ProblemCommand::Add { dir, slug, rejudge }) => {
+                    let dir = ask::path("Problem directory", "<DIR>", dir)?;
                     admin::problem_add(&c, &dir, slug.as_deref(), rejudge).await?
                 }
                 AdminCommand::Problem(ProblemCommand::List) => admin::problem_list(&c).await?,
@@ -219,6 +236,23 @@ async fn run(cli: Cli) -> Result<bool> {
                     cooldown,
                     problems,
                 }) => {
+                    // Asked only when the command is incomplete, so a full one stays as it was.
+                    let prompt = name.is_none() || minutes.is_none() || problems.is_empty();
+                    let name: String = ask::required("Round name", "--name", name)?;
+                    let minutes: u32 = ask::required("Duration (minutes)", "--minutes", minutes)?;
+                    if problems.is_empty() && ask::is_interactive() {
+                        println!("Available problems:");
+                        admin::problem_list(&c).await?;
+                    }
+                    let problems = ask::list(
+                        "Problems, in order (separated by spaces or commas)",
+                        "<PROBLEMS>",
+                        problems,
+                    )?;
+                    let freeze =
+                        ask::optional("Freeze boards before the end (minutes)", freeze, 0, prompt)?;
+                    let cooldown =
+                        ask::optional("Seconds between submissions", cooldown, 30, prompt)?;
                     let req = CreateRound {
                         name,
                         duration_minutes: minutes,
@@ -230,22 +264,47 @@ async fn run(cli: Cli) -> Result<bool> {
                 }
                 AdminCommand::Round(RoundCommand::List) => admin::round_list(&c).await?,
                 AdminCommand::Round(RoundCommand::Start { id }) => {
+                    let id = round_id(&c, id).await?;
                     admin::round_action(&c, id, "start", None).await?
                 }
                 AdminCommand::Round(RoundCommand::Stop { id }) => {
+                    let id = round_id(&c, id).await?;
                     admin::round_action(&c, id, "stop", None).await?
                 }
                 AdminCommand::Round(RoundCommand::Extend { id, minutes }) => {
+                    let id = round_id(&c, id).await?;
+                    let minutes: u32 = ask::required("Minutes to add", "<MINUTES>", minutes)?;
                     admin::round_action(&c, id, "extend", Some(minutes)).await?
                 }
                 AdminCommand::Submissions { round } => admin::submissions(&c, round).await?,
                 AdminCommand::Source { id, output } => {
+                    let id = submission_id(&c, id).await?;
                     let out = output.unwrap_or_else(|| format!("submission-{id}.tar.gz").into());
                     admin::source(&c, id, &out).await?
                 }
-                AdminCommand::Rejudge { id } => admin::rejudge(&c, id).await?,
+                AdminCommand::Rejudge { id } => {
+                    let id = submission_id(&c, id).await?;
+                    admin::rejudge(&c, id).await?
+                }
+                AdminCommand::Update => admin::update(&c).await?,
             }
         }
     }
     Ok(true)
+}
+
+/// The given round, or one picked from the list.
+async fn round_id(c: &Client, id: Option<i64>) -> Result<i64> {
+    if id.is_none() && ask::is_interactive() {
+        admin::round_list(c).await?;
+    }
+    ask::required("Round ID", "<ID>", id)
+}
+
+/// The given submission, or one picked from the current round's list.
+async fn submission_id(c: &Client, id: Option<i64>) -> Result<i64> {
+    if id.is_none() && ask::is_interactive() {
+        admin::submissions(c, None).await?;
+    }
+    ask::required("Submission ID", "<ID>", id)
 }
