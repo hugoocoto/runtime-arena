@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/hugoocoto/runtime-arena/compare/v0.8.0...v0.9.0) (2026-11-21)
+
+
+### Features
+
+* Add automatic HTTPS and LAN trust setup ([#19](https://github.com/hugoocoto/runtime-arena/issues/19)) ([4af7524](https://github.com/hugoocoto/runtime-arena/commit/4af7524bb387a79067d76608b97d37bfe7389638))
+
 ## [0.8.0](https://github.com/hugoocoto/runtime-arena/compare/v0.7.0...v0.8.0) (2026-11-21)
 
 
