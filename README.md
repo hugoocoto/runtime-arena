@@ -21,16 +21,18 @@ with Compose. The judge container runs **privileged**; read
 ```sh
 git clone https://github.com/hugoocoto/runtime-arena
 cd runtime-arena
-cp .env.example .env      # set ARENA_ADMIN_TOKEN (openssl rand -hex 32) and JUDGE_CPUS
+cp .env.example .env      # set ARENA_ADMIN_TOKEN (openssl rand -hex 32), ARENA_JOIN_CODE, JUDGE_CPUS
 docker compose up -d
 ```
 
-Open `http://<host>:8080/` on the projector. Then, with the `arena` CLI:
+Open `http://<host>:8080/` on the projector, and announce `http://<host>:8080/join`
+and the event code (`ARENA_JOIN_CODE`): participants create their own accounts
+there. Then, with the `arena` CLI:
 
 ```sh
 arena login --admin http://<host>:8080 <ARENA_ADMIN_TOKEN>
 arena admin problem add problems/sum          # a directory: problem.toml, statement.md, tests/
-arena admin user add alice --display-name "Alice"   # prints Alice's token, once
+arena admin user add alice --display-name "Alice"   # optional: an account made by you; prints its token once
 arena admin round create --name "Round 1" --minutes 60 --freeze 10 sum
 arena admin round start 1
 arena admin submissions                       # review; `arena admin source <id>` downloads code
@@ -71,14 +73,22 @@ ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... scripts/mock-contest.sh
 Download `arena` for your platform from the
 [releases](https://github.com/hugoocoto/runtime-arena/releases).
 
+1. Open `http://<host>:8080/join`, pick a username and password, and enter the
+   event code the organiser announced.
+2. Log in from your terminal (it asks for the username and password):
+
 ```sh
-arena login http://<host>:8080 <your token>
+arena login <host>:8080
 arena round                         # problems and time left
 arena problem sum --samples samples # statement; samples saved as samples/01.in ...
 arena build -- gcc -O2 -o sol sol.c # build in the judge's environment (Docker)
 arena submit sum ./sol --src sol.c  # source is required; shows each test's result
 arena board                         # live boards, time × memory chart, ranks over time
 ```
+
+Logging in again later, or on another machine, is just `arena login` (the
+server is remembered). If the organiser created your account, they give you a
+token instead: `arena login <host>:8080 <token>`.
 
 Submissions must run on the judge: a Linux x86-64 executable linked against the
 judge's libraries, or a `#!` script for an interpreter installed there

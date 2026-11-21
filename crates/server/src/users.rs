@@ -31,23 +31,31 @@ pub async fn create(
     State(state): State<AppState>,
     Json(req): Json<CreateUser>,
 ) -> ApiResult<Json<UserToken>> {
-    if !valid_slug(&req.name) {
+    Ok(Json(insert(&state, req.name, req.display_name).await?))
+}
+
+/// Creates a participant with a new token (admin creation and `/join`).
+pub(crate) async fn insert(
+    state: &AppState,
+    name: String,
+    display_name: Option<String>,
+) -> ApiResult<UserToken> {
+    if !valid_slug(&name) {
         return Err(ApiError::bad_request(
             "name must be 1-40 lowercase letters, digits or '-'",
         ));
     }
-    let display_name = req
-        .display_name
-        .map(|d| d.trim().to_owned())
+    let display_name = display_name
+        .map(|d| d.trim().chars().take(60).collect::<String>())
         .filter(|d| !d.is_empty())
-        .unwrap_or_else(|| req.name.clone());
+        .unwrap_or_else(|| name.clone());
     let token = new_token();
     let hash = hash_token(&token);
     let created_at = now();
     let inserted = sqlx::query!(
         "INSERT INTO users (name, display_name, token_hash, created_at) VALUES (?, ?, ?, ?)
          ON CONFLICT (name) DO NOTHING",
-        req.name,
+        name,
         display_name,
         hash,
         created_at
@@ -56,14 +64,10 @@ pub async fn create(
     .await?;
     if inserted.rows_affected() == 0 {
         return Err(ApiError::conflict(format!(
-            "user {} already exists",
-            req.name
+            "the name {name} is already taken"
         )));
     }
-    Ok(Json(UserToken {
-        name: req.name,
-        token,
-    }))
+    Ok(UserToken { name, token })
 }
 
 /// `POST /api/admin/users/{name}/token`: replaces a lost token; the old one stops working.
@@ -80,5 +84,12 @@ pub async fn reset_token(
     if updated.rows_affected() == 0 {
         return Err(ApiError::not_found(format!("no user {name}")));
     }
+    // A reset also logs out every device the participant logged in from.
+    sqlx::query!(
+        "DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE name = ?)",
+        name
+    )
+    .execute(&state.db)
+    .await?;
     Ok(Json(UserToken { name, token }))
 }

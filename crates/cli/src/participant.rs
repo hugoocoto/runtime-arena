@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use arena_protocol::{
-    ProblemStatement, RoundInfo, RoundState, ServerEvent, ServerInfo, SubmissionInfo,
-    SubmissionStatus, UserInfo, Verdict,
+    LoginRequest, ProblemStatement, RoundInfo, RoundState, ServerEvent, ServerInfo, SubmissionInfo,
+    SubmissionStatus, UserInfo, UserToken, Verdict,
 };
 
 use crate::client::Client;
@@ -34,29 +34,68 @@ pub fn participant(config: &Config) -> Result<Client> {
     Client::new(config.server()?, Some(token))
 }
 
-pub async fn login(server: &str, token: &str, admin: bool) -> Result<()> {
+/// Saves the server and a token. Without a token, asks for the username and
+/// password of the account created on the server's `/join` page.
+pub async fn login(server: Option<&str>, token: Option<&str>, admin: bool) -> Result<()> {
     let mut config = Config::load_file()?;
-    if admin {
-        let client = Client::new(server, Some(token.to_owned()))?;
-        client
-            .get::<Vec<UserInfo>>("/api/admin/users")
-            .await
-            .context("the admin token was refused")?;
-        config.admin_token = Some(token.to_owned());
-        println!("Admin token verified.");
-    } else {
-        let client = Client::new(server, Some(token.to_owned()))?;
-        let me: UserInfo = client
-            .get("/api/me")
-            .await
-            .context("the token was refused")?;
-        config.token = Some(token.to_owned());
-        println!("Logged in as {} ({}).", me.display_name, me.name);
+    let server = match server {
+        Some(s) => crate::client::normalise_server(s),
+        None => Config::load()?
+            .server
+            .context("give the server address, e.g. `arena login http://arena.local:8080`")?,
+    };
+    match (token, admin) {
+        (Some(token), true) => {
+            let client = Client::new(&server, Some(token.to_owned()))?;
+            client
+                .get::<Vec<UserInfo>>("/api/admin/users")
+                .await
+                .context("the admin token was refused")?;
+            config.admin_token = Some(token.to_owned());
+            println!("Admin token verified.");
+        }
+        (None, true) => bail!("give the admin token: `arena login --admin <server> <token>`"),
+        (Some(token), false) => {
+            let client = Client::new(&server, Some(token.to_owned()))?;
+            let me: UserInfo = client
+                .get("/api/me")
+                .await
+                .context("the token was refused")?;
+            config.token = Some(token.to_owned());
+            println!("Logged in as {} ({}).", me.display_name, me.name);
+        }
+        (None, false) => {
+            let name = prompt("Username: ")?;
+            let password = rpassword::prompt_password("Password: ")?;
+            let client = Client::new(&server, None)?;
+            let t: UserToken = client
+                .post("/api/login", &LoginRequest { name, password })
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!("{e:#}\nNo account yet? Create one at {server}/join")
+                })?;
+            let me: UserInfo = Client::new(&server, Some(t.token.clone()))?
+                .get("/api/me")
+                .await?;
+            config.token = Some(t.token);
+            println!("Logged in as {} ({}).", me.display_name, me.name);
+        }
     }
-    config.server = Some(server.trim_end_matches('/').to_owned());
-    let path = config.save()?;
-    println!("Saved to {}.", path.display());
+    config.server = Some(server);
+    config.save()?;
     Ok(())
+}
+
+fn prompt(label: &str) -> Result<String> {
+    print!("{label}");
+    std::io::stdout().flush()?;
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    let line = line.trim().to_owned();
+    if line.is_empty() {
+        bail!("no username given");
+    }
+    Ok(line)
 }
 
 pub async fn whoami(config: &Config) -> Result<()> {

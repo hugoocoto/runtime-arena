@@ -247,6 +247,23 @@ pub struct Board {
     pub by_memory: Vec<BoardEntry>,
 }
 
+/// Body of `POST /api/signup`, sent by the `/join` page.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SignupRequest {
+    pub name: String,
+    pub display_name: Option<String>,
+    pub password: String,
+    /// The event code the organiser announced (`ARENA_JOIN_CODE`).
+    pub join_code: String,
+}
+
+/// Body of `POST /api/login`. The answer is a [`UserToken`] for this device.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LoginRequest {
+    pub name: String,
+    pub password: String,
+}
+
 /// An accepted submission as shown publicly (for rank-over-time charts).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcceptedSubmission {

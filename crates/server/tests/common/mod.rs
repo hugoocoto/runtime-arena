@@ -14,6 +14,7 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 pub const ADMIN: &str = "test-admin-token-0123456789abcdef";
+pub const JOIN_CODE: &str = "blue-falcon";
 
 pub struct TestServer {
     pub app: Router,
@@ -26,16 +27,26 @@ impl TestServer {
         Self::with_judge(Arc::new(FakeJudge)).await
     }
 
+    pub async fn with_config(change: impl FnOnce(&mut Config)) -> Self {
+        Self::build(Arc::new(FakeJudge), change).await
+    }
+
     pub async fn with_judge(judge: Arc<dyn JudgeBackend>) -> Self {
+        Self::build(judge, |_| {}).await
+    }
+
+    async fn build(judge: Arc<dyn JudgeBackend>, change: impl FnOnce(&mut Config)) -> Self {
         let data = tempfile::tempdir().unwrap();
-        let config = Config {
+        let mut config = Config {
             listen: "127.0.0.1:0".parse().unwrap(),
             data_dir: data.path().to_path_buf(),
             admin_token: ADMIN.into(),
+            join_code: Some(JOIN_CODE.into()),
             judge_boxes: vec![0],
             isolate: "isolate".into(),
             runs_per_test: 1,
         };
+        change(&mut config);
         let db = open_db(&config.data_dir).await.unwrap();
         let state = AppState::new(db, config, judge);
         TestServer {

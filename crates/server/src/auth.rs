@@ -50,15 +50,9 @@ impl FromRequestParts<AppState> for Participant {
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
         let token = bearer(parts).ok_or_else(ApiError::unauthorized)?;
-        let hash = hash_token(token);
-        sqlx::query_as!(
-            Participant,
-            "SELECT id, name, display_name FROM users WHERE token_hash = ?",
-            hash
-        )
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(ApiError::unauthorized)
+        find_by_token(state, token)
+            .await?
+            .ok_or_else(ApiError::unauthorized)
     }
 }
 
@@ -83,10 +77,20 @@ pub(crate) async fn participant_from_headers(
     let Some(token) = bearer_header(headers) else {
         return Ok(None);
     };
+    find_by_token(state, token).await
+}
+
+/// The participant owning `token`: their admin-issued token, or a login session.
+async fn find_by_token(state: &AppState, token: &str) -> Result<Option<Participant>, ApiError> {
     let hash = hash_token(token);
     Ok(sqlx::query_as!(
         Participant,
-        "SELECT id, name, display_name FROM users WHERE token_hash = ?",
+        "SELECT id, name, display_name FROM users WHERE token_hash = ?
+         UNION ALL
+         SELECT u.id, u.name, u.display_name
+         FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?
+         LIMIT 1",
+        hash,
         hash
     )
     .fetch_optional(&state.db)

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, display_name FROM users WHERE token_hash = ?",
+  "query": "SELECT id, password_hash FROM users WHERE name = ?",
   "describe": {
     "columns": [
       {
@@ -15,24 +15,13 @@
         }
       },
       {
-        "name": "name",
+        "name": "password_hash",
         "ordinal": 1,
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "users",
-            "name": "name"
-          }
-        }
-      },
-      {
-        "name": "display_name",
-        "ordinal": 2,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "users",
-            "name": "display_name"
+            "name": "password_hash"
           }
         }
       }
@@ -42,9 +31,8 @@
     },
     "nullable": [
       false,
-      false,
-      false
+      true
     ]
   },
-  "hash": "0d0968acb743a67e9bde0aefe74149bf7e2697a7f0b9cd8d76312a285c40f1ad"
+  "hash": "002153f45b8ff1f149db7f1a8a00c0f9a92cb4e1798e77d194148255189c72dd"
 }
