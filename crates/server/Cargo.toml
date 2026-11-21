@@ -15,6 +15,8 @@ axum = { version = "0.8.9", features = ["multipart", "ws"] }
 flate2 = "1.1.11"
 hex = "0.4.3"
 rand = "0.10.4"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "http2"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
@@ -23,9 +25,10 @@ subtle = "2.6.1"
 tar = "0.4.46"
 tempfile = "3.27.0"
 thiserror = "2.0.21"
-tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "signal", "net", "fs"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "signal", "net", "fs", "time"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+webpki-root-certs = "1.0.12"
 
 [lints]
 workspace = true

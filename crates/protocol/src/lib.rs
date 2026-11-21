@@ -10,6 +10,16 @@ pub struct ServerInfo {
     pub source_url: String,
 }
 
+/// Response of `GET /api/admin/update`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UpdateInfo {
+    pub current: String,
+    /// Latest published release; `None` until a check succeeds.
+    pub latest: Option<String>,
+    pub update_available: bool,
+    pub release_url: Option<String>,
+}
+
 /// Outcome of running a submission on one test, or on all of them.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]

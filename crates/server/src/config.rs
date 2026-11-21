@@ -22,6 +22,8 @@ pub struct Config {
     pub isolate: PathBuf,
     /// Times each accepted test runs; the best time and memory count.
     pub runs_per_test: u32,
+    /// Periodically ask GitHub for the latest release (`ARENA_UPDATE_CHECK=off` disables).
+    pub update_check: bool,
 }
 
 impl Config {
@@ -57,6 +59,11 @@ impl Config {
                 .ok_or("ARENA_RUNS_PER_TEST must be a positive integer")?,
             None => 3,
         };
+        let update_check = match var("ARENA_UPDATE_CHECK").as_deref() {
+            None | Some("on" | "true" | "1") => true,
+            Some("off" | "false" | "0") => false,
+            Some(_) => return Err("ARENA_UPDATE_CHECK must be on or off".into()),
+        };
         Ok(Config {
             listen,
             data_dir,
@@ -67,6 +74,7 @@ impl Config {
                 .unwrap_or_else(|| "isolate".into())
                 .into(),
             runs_per_test,
+            update_check,
         })
     }
 }

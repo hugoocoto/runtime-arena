@@ -132,7 +132,8 @@ Uploaded with `arena admin problem add <dir>`.
 ## CLI
 
 ```
-arena login [server] [token] [--admin]    # no token: asks for username and password
+arena login [server] [token]              # no token: asks for username and password
+arena login --admin                       # ARENA_ADMIN_TOKEN, ARENA_SERVER from env or ./.env
 arena whoami | arena round | arena problem <slug> [--samples DIR]
 arena build -- <build command>          # inside the build image
 arena submit <problem> ./exe --src <file|dir> [--no-wait]

@@ -60,6 +60,7 @@ async fn start_server(data: &Path) -> String {
         judge_boxes: vec![0],
         isolate: "isolate".into(),
         runs_per_test: 1,
+        update_check: false,
     };
     let db = arena_server::open_db(data).await.unwrap();
     let state = AppState::new(db, config, Arc::new(FakeJudge));

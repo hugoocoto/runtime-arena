@@ -4,8 +4,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use arena_protocol::{
-    CreateRound, CreateUser, ExtendRound, ProblemSummary, RoundInfo, SubmissionInfo, UserInfo,
-    UserToken,
+    CreateRound, CreateUser, ExtendRound, ProblemSummary, RoundInfo, SubmissionInfo, UpdateInfo,
+    UserInfo, UserToken,
 };
 use serde_json::json;
 
@@ -16,9 +16,49 @@ use crate::participant::{pack, print_result, print_round};
 
 pub fn admin(config: &Config) -> Result<Client> {
     let token = config.admin_token.clone().context(
-        "no admin token; run `arena login --admin <server> <token>` or set ARENA_ADMIN_TOKEN",
+        "no admin token; run `arena login --admin` or set ARENA_SERVER and ARENA_ADMIN_TOKEN",
     )?;
     Client::new(config.server()?, Some(token))
+}
+
+const UPGRADE_HINT: &str = "Update the host with: docker compose pull && docker compose up -d\n\
+     (if ARENA_VERSION in .env is pinned, change it first)";
+
+/// `arena admin update`: whether a newer server release exists.
+pub async fn update(c: &Client) -> Result<()> {
+    let info: UpdateInfo = c
+        .get("/api/admin/update")
+        .await
+        .context("this server is too old to report updates")?;
+    println!("Server version: {}", info.current);
+    match &info.latest {
+        Some(latest) => println!("Latest release: {latest}"),
+        None => println!("Latest release: unknown (no successful check yet)"),
+    }
+    if info.update_available {
+        print_update(&info);
+    } else if info.latest.is_some() {
+        println!("Up to date.");
+    }
+    Ok(())
+}
+
+/// After an admin login: mentions an update, and stays quiet otherwise.
+pub async fn notify_update(c: &Client) {
+    if let Ok(info) = c.get::<UpdateInfo>("/api/admin/update").await
+        && info.update_available
+    {
+        print_update(&info);
+    }
+}
+
+fn print_update(info: &UpdateInfo) {
+    let latest = info.latest.as_deref().unwrap_or("?");
+    println!("Update available: {} -> {latest}", info.current);
+    if let Some(url) = &info.release_url {
+        println!("{url}");
+    }
+    println!("{UPGRADE_HINT}");
 }
 
 pub async fn user_add(c: &Client, name: &str, display_name: Option<String>) -> Result<()> {
