@@ -51,6 +51,12 @@ pub fn now() -> i64 {
         .unwrap_or(0)
 }
 
+/// Prints a value as indented JSON, for `--json`.
+pub fn print_json<T: serde::Serialize>(value: &T) -> anyhow::Result<()> {
+    println!("{}", serde_json::to_string_pretty(value)?);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

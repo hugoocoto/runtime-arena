@@ -4,7 +4,7 @@ mod common;
 
 use std::time::Duration;
 
-use arena_protocol::{ServerEvent, UserToken, Verdict};
+use arena_protocol::{ServerEvent, Verdict};
 use common::{ADMIN, TestServer, fake_solution};
 use futures_util::StreamExt;
 use serde_json::json;
@@ -61,17 +61,8 @@ async fn participants_get_their_own_progress_and_everyone_gets_boards() {
     arena_server::start_background(&s.state).await.unwrap();
     s.upload_problem("sum", common::problem_archive("sum"))
         .await;
-    let token = |b: serde_json::Value| serde_json::from_value::<UserToken>(b).unwrap().token;
-    let alice = token(
-        s.post("/api/admin/users", Some(ADMIN), json!({"name": "alice"}))
-            .await
-            .1,
-    );
-    let bob = token(
-        s.post("/api/admin/users", Some(ADMIN), json!({"name": "bob"}))
-            .await
-            .1,
-    );
+    let alice = s.participant("alice").await;
+    let bob = s.participant("bob").await;
     let (_, round) = s
         .post(
             "/api/admin/rounds",

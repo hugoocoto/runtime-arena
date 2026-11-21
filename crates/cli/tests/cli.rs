@@ -6,7 +6,9 @@ use std::sync::Arc;
 use arena_cli::client::Client;
 use arena_cli::config::Config;
 use arena_cli::{admin, participant};
-use arena_protocol::{CreateRound, JudgeReport, TestResult, UserToken, Verdict};
+use arena_protocol::{
+    CreateRound, JudgeReport, LoginRequest, SignupRequest, TestResult, UserInfo, UserToken, Verdict,
+};
 use arena_server::backend::{JudgeFuture, ProgressFn};
 use arena_server::{AppState, JudgeBackend};
 
@@ -61,6 +63,7 @@ async fn start_server(data: &Path) -> String {
         isolate: "isolate".into(),
         runs_per_test: 1,
         update_check: false,
+        rate_limit: 0,
     };
     let db = arena_server::open_db(data).await.unwrap();
     let state = AppState::new(db, config, Arc::new(FakeJudge));
@@ -85,12 +88,25 @@ async fn organiser_and_participant_flow() {
     admin::problem_add(&admin_client, &fixture(), Some("sum"), false)
         .await
         .unwrap();
-    let alice: UserToken = admin_client
+    let anonymous_client = Client::new(&server, None).unwrap();
+    let _: UserInfo = anonymous_client
         .post(
-            "/api/admin/users",
-            &arena_protocol::CreateUser {
+            "/api/signup",
+            &SignupRequest {
                 name: "alice".into(),
                 display_name: None,
+                password: "secret1".into(),
+                join_code: JOIN_CODE.into(),
+            },
+        )
+        .await
+        .unwrap();
+    let alice: UserToken = anonymous_client
+        .post(
+            "/api/login",
+            &LoginRequest {
+                name: "alice".into(),
+                password: "secret1".into(),
             },
         )
         .await

@@ -17,6 +17,7 @@ services:
       ARENA_JOIN_CODE: ${ARENA_JOIN_CODE:-}
       JUDGE_CPUS: ${JUDGE_CPUS:-}
       ARENA_UPDATE_CHECK: ${ARENA_UPDATE_CHECK:-on}
+      ARENA_RATE_LIMIT: ${ARENA_RATE_LIMIT:-200}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - arena-data:/data

@@ -16,7 +16,7 @@ hidden tests and ranks by **execution time** and **memory**.
 | Sandbox | isolate 2.0 (cgroup v2). |
 | Rankings | Two per problem: a **time** board and a **memory** board. |
 | Overall standings | **Left open.** Raw per-test results are stored and boards are computed on demand by a pluggable scoring function, chosen per round. v1 ships per-problem boards only. |
-| Identity | Self sign-up on `/join` with the event code, then `arena login` (username + password); admin-issued tokens still work. |
+| Identity | Self sign-up on `/join` or with `arena signup` using the event code, then `arena login` (username + password). |
 | Admin | Same CLI with an admin token (`arena admin ...`). |
 | Language | Rust for server and CLI. |
 | CLI views | Live time and memory leaderboards, time-vs-memory scatter, rank over time, own submission history. |
@@ -78,13 +78,17 @@ Decided 2026-11-20. Built in three PRs: **A** schema, auth and admin API;
 
 - **Auth**: `Authorization: Bearer <token>`. The admin token is `ARENA_ADMIN_TOKEN`
   (required, ≥ 24 characters, or the server refuses to start). Participant tokens
-  are 256-bit random (`arena_…`), shown once, stored as SHA-256.
+  are 256-bit random (`arena_…`), issued per device at login, stored as SHA-256.
 - **Accounts** (decided 2026-11-21): participants sign up on `/join` with a
   username, password and the event code `ARENA_JOIN_CODE` (auto-approved; unset
   disables sign-up). `arena login <server>` asks for username and password and
-  stores a per-device session token, so several machines can be logged in. The
-  admin can still create users and hand out tokens; `user reset` also ends all
-  sessions. Passwords are argon2id hashes.
+  stores a per-device session token, so several machines can be logged in;
+  `arena logout` ends one. Sign-up is the only way to create an account (admin-created
+  accounts were removed 2026-11-21). The admin recovers an account with
+  `user reset-password`. Passwords are argon2id hashes. Failed logins are limited
+  in memory per 15 minutes: 10 per account and address, 100 per address (wrong event codes count too). Each address also gets 300 sign-ups
+  per 15 minutes, `ARENA_RATE_LIMIT` requests per second and 512 connections (4096
+  in total); at most 4 password hashes run at once.
 - **Rounds**: created as drafts, started manually, end by themselves after their
   duration; the admin can stop early or extend. One round runs at a time.
   Submissions are accepted only while a round runs. Optional `freeze_minutes`
@@ -107,8 +111,8 @@ API (part A):
 | GET | `/api/me` | participant |
 | GET | `/api/rounds/current` | anyone |
 | GET | `/api/problems/{slug}` (statement and samples, once its round started) | participant, admin |
-| GET, POST | `/api/admin/users` | admin |
-| POST | `/api/admin/users/{name}/token` (new token) | admin |
+| GET | `/api/admin/users` | admin |
+| POST | `/api/admin/users/{name}/password` (new random password, ends all sessions) | admin |
 | GET | `/api/admin/problems` | admin |
 | PUT | `/api/admin/problems/{slug}` (`.tar.gz` body) | admin |
 | GET, POST | `/api/admin/rounds` | admin |
@@ -132,17 +136,20 @@ Uploaded with `arena admin problem add <dir>`.
 ## CLI
 
 ```
-arena login [server] [token]              # no token: asks for username and password
+arena signup [server] [-u NAME] [--join-code CODE] [--password-stdin]
+arena login [server] [-u NAME] [--password-stdin]
+arena logout [--admin]
 arena login --admin                       # ARENA_ADMIN_TOKEN, ARENA_SERVER from env or ./.env
 arena whoami | arena round | arena problem <slug> [--samples DIR]
 arena build -- <build command>          # inside the build image
 arena submit <problem> ./exe --src <file|dir> [--no-wait]
 arena submissions [id]
 arena board                             # TUI: time / memory / scatter / rank-over-time / mine
-arena admin user add|list|reset
+arena admin user list | reset-password <name>
 arena admin problem add <dir> [--slug] [--rejudge] | list
 arena admin round create|list|start|stop|extend
 arena admin submissions [--round] | source <id> | rejudge <id>
+arena completions <shell>
 ```
 
 ## Build order

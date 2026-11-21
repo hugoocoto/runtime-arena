@@ -6,6 +6,8 @@ pub mod backend;
 mod boards;
 pub mod config;
 pub mod error;
+mod login_limit;
+pub mod net_limit;
 mod problems;
 mod queue;
 mod rounds;
@@ -24,7 +26,7 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
-use tokio::sync::{Mutex, Notify, broadcast};
+use tokio::sync::{Mutex, Notify, Semaphore, broadcast};
 
 pub use backend::{IsolateBackend, JudgeBackend};
 pub use config::Config;
@@ -55,10 +57,17 @@ pub struct AppState {
     upload_lock: Arc<Mutex<()>>,
     /// Latest published release, once an update check has succeeded.
     latest_version: Arc<RwLock<Option<String>>>,
+    /// Failed password attempts.
+    login_limit: Arc<login_limit::LoginLimiter>,
+    /// Requests per second from each address.
+    request_limit: Arc<net_limit::RequestLimiter>,
+    /// Password hashes running at once.
+    hash_slots: Arc<Semaphore>,
 }
 
 impl AppState {
     pub fn new(db: SqlitePool, config: Config, judge: Arc<dyn JudgeBackend>) -> Self {
+        let request_limit = Arc::new(net_limit::RequestLimiter::new(config.rate_limit));
         AppState {
             db,
             config: Arc::new(config),
@@ -68,6 +77,9 @@ impl AppState {
             submit_lock: Arc::new(Mutex::new(())),
             upload_lock: Arc::new(Mutex::new(())),
             latest_version: Arc::new(RwLock::new(None)),
+            login_limit: Arc::default(),
+            request_limit,
+            hash_slots: Arc::new(Semaphore::new(accounts::MAX_PASSWORD_HASHES)),
         }
     }
 
@@ -104,10 +116,11 @@ pub async fn start_background(state: &AppState) -> Result<(), sqlx::Error> {
 }
 
 pub fn app(state: AppState) -> Router {
+    let limiter = state.clone();
     let admin = Router::new()
         .route("/update", get(updates::status))
-        .route("/users", get(users::list).post(users::create))
-        .route("/users/{name}/token", post(users::reset_token))
+        .route("/users", get(users::list))
+        .route("/users/{name}/password", post(accounts::reset_password))
         .route("/problems", get(problems::list))
         .route(
             "/problems/{slug}",
@@ -130,6 +143,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/me", get(users::me))
         .route("/api/signup", post(accounts::signup))
         .route("/api/login", post(accounts::login))
+        .route("/api/logout", post(accounts::logout))
         .route("/api/me/submissions", get(submissions::mine))
         .route("/api/rounds/current", get(rounds::current))
         .route("/api/rounds/{id}/boards", get(boards::round_boards))
@@ -145,6 +159,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/submissions/{id}", get(submissions::get))
         .nest("/api/admin", admin)
         .with_state(state)
+        .layer(axum::middleware::from_fn_with_state(
+            limiter,
+            net_limit::limit_requests,
+        ))
 }
 
 /// The read-only leaderboard page for a projector, built into the binary.

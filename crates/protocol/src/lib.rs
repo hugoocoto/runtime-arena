@@ -101,15 +101,6 @@ pub struct UserInfo {
     pub display_name: String,
 }
 
-/// Body of `POST /api/admin/users`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CreateUser {
-    /// Login name: lowercase letters, digits and `-`.
-    pub name: String,
-    /// Shown on leaderboards; defaults to `name`.
-    pub display_name: Option<String>,
-}
-
 /// A participant's token. Returned only when it is created; the server keeps a hash.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UserToken {
@@ -257,7 +248,7 @@ pub struct Board {
     pub by_memory: Vec<BoardEntry>,
 }
 
-/// Body of `POST /api/signup`, sent by the `/join` page.
+/// Body of `POST /api/signup`, sent by the `/join` page and `arena signup`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SignupRequest {
     pub name: String,
@@ -270,6 +261,13 @@ pub struct SignupRequest {
 /// Body of `POST /api/login`. The answer is a [`UserToken`] for this device.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LoginRequest {
+    pub name: String,
+    pub password: String,
+}
+
+/// Answer of `POST /api/admin/users/{name}/password`. Shown once; the server keeps a hash.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PasswordReset {
     pub name: String,
     pub password: String,
 }

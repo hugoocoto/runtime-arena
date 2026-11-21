@@ -52,6 +52,11 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS rust
+# Unset in releases. CI sets them to compile faster: its sandbox tests don't run
+# the server binary, they only need the image to build.
+ARG CARGO_PROFILE_RELEASE_LTO
+ARG CARGO_PROFILE_RELEASE_OPT_LEVEL
+ARG CARGO_PROFILE_RELEASE_CODEGEN_UNITS
 COPY rust-toolchain.toml ./
 COPY --from=planner /src/recipe.json recipe.json
 RUN cargo chef cook --release --locked -p arena-server --recipe-path recipe.json

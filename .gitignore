@@ -4,3 +4,17 @@
 /tests/sandbox/out
 /problems/sum/tests/03.*
 /problems/sum/tests/04.*
+
+# Secrets and local environments
+.env.*
+!.env.example
+
+# Generated or downloaded by the CLI and release job
+/extras
+/submission-*.tar.gz
+*.db
+*.db-shm
+*.db-wal
+
+# Private notes
+/DISTRIBUTION.md

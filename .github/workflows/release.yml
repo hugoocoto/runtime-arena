@@ -30,9 +30,31 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+  # Completions and man pages are the same for every platform. Generated once
+  # here, since not every job below can run the binary it cross-compiles.
+  extras:
+    name: Completions and man pages
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+      - run: cargo run --locked -p arena-cli -- generate extras
+      - run: tar czf "arena-${TAG}-extras.tar.gz" -C extras completions man
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "arena-${TAG}-extras.tar.gz" --clobber
+
   cli:
     name: CLI ${{ matrix.target }}
-    needs: release-please
+    needs: [release-please, extras]
     if: needs.release-please.outputs.created == 'true'
     permissions:
       contents: write
@@ -61,6 +83,8 @@ jobs:
         shell: bash
       - name: Package
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           name="arena-${TAG}-${TARGET}"
           mkdir "$name"
@@ -68,17 +92,38 @@ jobs:
           if [[ "$TARGET" == *windows* ]]; then
             cp "target/$TARGET/release/arena.exe" "$name/"
             7z a "$name.zip" "$name" > /dev/null
-            echo "ASSET=$name.zip" >> "$GITHUB_ENV"
+            asset="$name.zip"
           else
-            cp "target/$TARGET/release/arena" "$name/"
+            cp "target/$TARGET/release/arena" packaging/Makefile "$name/"
+            gh release download "$TAG" --pattern "arena-${TAG}-extras.tar.gz" --output extras.tar.gz
+            tar xzf extras.tar.gz -C "$name"
             tar czf "$name.tar.gz" "$name"
-            echo "ASSET=$name.tar.gz" >> "$GITHUB_ENV"
+            asset="$name.tar.gz"
           fi
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
       - name: Upload to release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$ASSET" --clobber
+
+  checksums:
+    name: SHA256SUMS
+    needs: [release-please, cli]
+    # Also after a failed platform, so the others can still be installed.
+    if: ${{ !cancelled() && needs.release-please.outputs.created == 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'arena-*' --dir assets
+          cd assets
+          sha256sum -- arena-* > SHA256SUMS
+          gh release upload "$TAG" SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
 
   images:
     name: Image ${{ matrix.target }}
@@ -123,3 +168,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}

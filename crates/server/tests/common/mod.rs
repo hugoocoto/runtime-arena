@@ -46,6 +46,7 @@ impl TestServer {
             isolate: "isolate".into(),
             runs_per_test: 1,
             update_check: false,
+            rate_limit: 0,
         };
         change(&mut config);
         let db = open_db(&config.data_dir).await.unwrap();
@@ -55,6 +56,19 @@ impl TestServer {
             state,
             _data: data,
         }
+    }
+
+    /// Signs up `name` and logs in, returning the session token.
+    pub async fn participant(&self, name: &str) -> String {
+        let password = "secret1";
+        let signup =
+            serde_json::json!({"name": name, "password": password, "join_code": JOIN_CODE});
+        let (status, body) = self.post("/api/signup", None, signup).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let login = serde_json::json!({"name": name, "password": password});
+        let (status, body) = self.post("/api/login", None, login).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        body["token"].as_str().unwrap().to_owned()
     }
 
     pub async fn request(&self, req: Request<Body>) -> (StatusCode, Value) {

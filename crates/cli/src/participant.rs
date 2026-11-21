@@ -1,4 +1,4 @@
-//! Commands for participants: login, round, problem, submit, submissions, build.
+//! Commands for participants: signup, login, logout, round, problem, submit, submissions, build.
 
 use std::collections::VecDeque;
 use std::io::Write;
@@ -6,12 +6,14 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use arena_protocol::{
-    LoginRequest, ProblemStatement, RoundInfo, RoundState, ServerEvent, ServerInfo, SubmissionInfo,
-    SubmissionStatus, UserInfo, UserToken, Verdict,
+    LoginRequest, ProblemStatement, RoundInfo, RoundState, ServerEvent, ServerInfo, SignupRequest,
+    SubmissionInfo, SubmissionStatus, UserInfo, UserToken, Verdict,
 };
 
-use crate::client::Client;
+use crate::ask;
+use crate::client::{Client, version_mismatch};
 use crate::config::Config;
+use crate::errors::{NotLoggedIn, UsageError, status_of};
 use crate::format;
 
 /// Largest source archive the server accepts.
@@ -27,53 +29,141 @@ const SKIP_DIRS: &[&str] = &[
 ];
 
 pub fn participant(config: &Config) -> Result<Client> {
-    let token = config
-        .token
-        .clone()
-        .context("not logged in; run `arena login <server>`")?;
+    let token = config.token.clone().ok_or_else(|| {
+        NotLoggedIn(
+            "not logged in; run `arena login <server>`, \
+             or `arena signup <server>` for a new account"
+                .into(),
+        )
+    })?;
     Client::new(config.server()?, Some(token))
 }
 
-/// Saves the server and a token. Without a token, asks for the username and
-/// password of the account created on the server's `/join` page.
-pub async fn login(server: Option<&str>, token: Option<&str>) -> Result<()> {
+/// The given server, else the remembered one.
+fn target_server(server: Option<&str>, command: &str) -> Result<String> {
+    match server {
+        Some(s) => Ok(crate::client::normalise_server(s)),
+        None => Config::load()?.server.ok_or_else(|| {
+            UsageError(format!(
+                "give the server address, e.g. `arena {command} arena.local:8080`"
+            ))
+            .into()
+        }),
+    }
+}
+
+/// A password from standard input or a hidden prompt, typed twice if `confirm`.
+fn read_password(from_stdin: bool, confirm: bool) -> Result<String> {
+    if from_stdin {
+        if ask::is_interactive() {
+            return Err(UsageError("--password-stdin needs the password piped in".into()).into());
+        }
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line)?;
+        let password = line.trim_end_matches(['\r', '\n']).to_owned();
+        if password.is_empty() {
+            return Err(UsageError("no password on standard input".into()).into());
+        }
+        return Ok(password);
+    }
+    if !ask::is_interactive() {
+        return Err(UsageError("missing password; pipe it in with --password-stdin".into()).into());
+    }
+    let password = rpassword::prompt_password("Password: ")?;
+    if confirm && password != rpassword::prompt_password("Repeat password: ")? {
+        bail!("the passwords don't match");
+    }
+    Ok(password)
+}
+
+/// Exchanges name and password for a device token and saves it.
+async fn log_in(server: &str, name: String, password: String) -> Result<()> {
     let mut config = Config::load_file()?;
-    let server = match server {
-        Some(s) => crate::client::normalise_server(s),
-        None => Config::load()?
-            .server
-            .context("give the server address, e.g. `arena login http://arena.local:8080`")?,
-    };
-    let token = match token {
-        Some(token) => {
-            let client = Client::new(&server, Some(token.to_owned()))?;
-            let me: UserInfo = client
-                .get("/api/me")
-                .await
-                .context("the token was refused")?;
-            println!("Logged in as {} ({}).", me.display_name, me.name);
-            token.to_owned()
-        }
-        None => {
-            let name = prompt("Username: ")?;
-            let password = rpassword::prompt_password("Password: ")?;
-            let client = Client::new(&server, None)?;
-            let t: UserToken = client
-                .post("/api/login", &LoginRequest { name, password })
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!("{e:#}\nNo account yet? Create one at {server}/join")
-                })?;
-            let me: UserInfo = Client::new(&server, Some(t.token.clone()))?
-                .get("/api/me")
-                .await?;
-            println!("Logged in as {} ({}).", me.display_name, me.name);
-            t.token
-        }
-    };
-    config.set_server(&server);
-    config.token = Some(token);
+    let t: UserToken = Client::new(server, None)?
+        .post("/api/login", &LoginRequest { name, password })
+        .await?;
+    let client = Client::new(server, Some(t.token.clone()))?;
+    let me: UserInfo = client.get("/api/me").await?;
+    config.set_server(server);
+    config.token = Some(t.token);
     config.save()?;
+    println!("Logged in as {} ({}).", me.display_name, me.name);
+    client.warn_if_version_differs().await;
+    Ok(())
+}
+
+/// Logs in with the username and password of an existing account.
+pub async fn login(
+    server: Option<&str>,
+    username: Option<String>,
+    password_stdin: bool,
+) -> Result<()> {
+    let server = target_server(server, "login")?;
+    let name: String = ask::required("Username", "--username", username)?;
+    let password = read_password(password_stdin, false)?;
+    log_in(&server, name, password).await
+}
+
+/// Creates an account with the event code, then logs in to it.
+pub async fn signup(
+    server: Option<&str>,
+    username: Option<String>,
+    display_name: Option<String>,
+    join_code: Option<String>,
+    password_stdin: bool,
+) -> Result<()> {
+    let server = target_server(server, "signup")?;
+    let name: String = ask::required("Username", "--username", username)?;
+    let join_code: String = ask::required("Event code", "--join-code", join_code)?;
+    let password = read_password(password_stdin, true)?;
+    let created: UserInfo = Client::new(&server, None)?
+        .post(
+            "/api/signup",
+            &SignupRequest {
+                name,
+                display_name,
+                password: password.clone(),
+                join_code,
+            },
+        )
+        .await?;
+    log_in(&server, created.name, password).await
+}
+
+/// Forgets the saved token, ending its session on the server when possible.
+/// The local token always goes, so logging out works offline too.
+pub async fn logout(admin: bool) -> Result<()> {
+    let mut config = Config::load_file()?;
+    if admin {
+        if config.admin_token.take().is_none() {
+            println!("No admin token saved.");
+            return Ok(());
+        }
+        config.save()?;
+        println!("Admin token removed from this device.");
+        return Ok(());
+    }
+    let Some(token) = config.token.take() else {
+        println!("Not logged in.");
+        return Ok(());
+    };
+    let ended = match config.server.as_deref() {
+        Some(server) => Client::new(server, Some(token))?
+            .post_empty("/api/logout")
+            .await
+            .map_err(|e| (status_of(&e), e)),
+        None => Ok(()),
+    };
+    config.save()?;
+    match ended {
+        Ok(()) => println!("Logged out."),
+        // The session is already gone.
+        Err((Some(reqwest::StatusCode::UNAUTHORIZED), _)) => println!("Logged out."),
+        Err((_, e)) => {
+            println!("Logged out of this device.");
+            eprintln!("warning: the session may still be active on the server: {e:#}");
+        }
+    }
     Ok(())
 }
 
@@ -188,22 +278,22 @@ fn is_loopback(server: &str) -> bool {
             .is_ok_and(|ip| ip.is_loopback())
 }
 
-fn prompt(label: &str) -> Result<String> {
-    print!("{label}");
-    std::io::stdout().flush()?;
-    let mut line = String::new();
-    std::io::stdin().read_line(&mut line)?;
-    let line = line.trim().to_owned();
-    if line.is_empty() {
-        bail!("no username given");
-    }
-    Ok(line)
-}
-
-pub async fn whoami(config: &Config) -> Result<()> {
+pub async fn whoami(config: &Config, json: bool) -> Result<()> {
     let client = participant(config)?;
     let info: ServerInfo = client.get("/api/info").await?;
     let me: UserInfo = client.get("/api/me").await?;
+    if let Some(warning) = version_mismatch(env!("CARGO_PKG_VERSION"), &info.version) {
+        eprintln!("{warning}");
+    }
+    if json {
+        return format::print_json(&serde_json::json!({
+            "name": me.name,
+            "display_name": me.display_name,
+            "server": client.base(),
+            "server_version": info.version,
+            "source_url": info.source_url,
+        }));
+    }
     println!("{} ({}) on {}", me.display_name, me.name, client.base());
     println!("server {} — source: {}", info.version, info.source_url);
     Ok(())
@@ -235,27 +325,39 @@ pub fn print_round(round: &RoundInfo) {
     }
 }
 
-pub async fn round(config: &Config) -> Result<()> {
+pub async fn round(config: &Config, json: bool) -> Result<()> {
     let client = Client::new(config.server()?, config.token.clone())?;
     let round: RoundInfo = client.get("/api/rounds/current").await?;
+    if json {
+        return format::print_json(&round);
+    }
     print_round(&round);
     Ok(())
 }
 
-pub async fn problem(config: &Config, slug: &str, samples_dir: Option<&Path>) -> Result<()> {
+pub async fn problem(
+    config: &Config,
+    slug: &str,
+    samples_dir: Option<&Path>,
+    json: bool,
+) -> Result<()> {
     let client = participant(config)?;
     let p: ProblemStatement = client.get(&format!("/api/problems/{slug}")).await?;
-    println!("# {}\n", p.title);
-    println!(
-        "Limits: {} ms CPU time, {} MiB memory\n",
-        p.time_limit_ms, p.memory_limit_mb
-    );
-    println!("{}", p.statement.trim_end());
-    for s in &p.samples {
+    if json {
+        format::print_json(&p)?;
+    } else {
+        println!("# {}\n", p.title);
         println!(
-            "\n## Sample {}\n\nInput:\n{}\nOutput:\n{}",
-            s.name, s.input, s.output
+            "Limits: {} ms CPU time, {} MiB memory\n",
+            p.time_limit_ms, p.memory_limit_mb
         );
+        println!("{}", p.statement.trim_end());
+        for s in &p.samples {
+            println!(
+                "\n## Sample {}\n\nInput:\n{}\nOutput:\n{}",
+                s.name, s.input, s.output
+            );
+        }
     }
     if let Some(dir) = samples_dir {
         std::fs::create_dir_all(dir)?;
@@ -263,7 +365,12 @@ pub async fn problem(config: &Config, slug: &str, samples_dir: Option<&Path>) ->
             std::fs::write(dir.join(format!("{}.in", s.name)), &s.input)?;
             std::fs::write(dir.join(format!("{}.out", s.name)), &s.output)?;
         }
-        println!("\nSamples written to {}.", dir.display());
+        // On stderr with --json, so stdout stays one JSON document.
+        if json {
+            eprintln!("Samples written to {}.", dir.display());
+        } else {
+            println!("\nSamples written to {}.", dir.display());
+        }
     }
     Ok(())
 }
@@ -446,14 +553,20 @@ pub fn print_result(s: &SubmissionInfo) {
     }
 }
 
-pub async fn submissions(config: &Config, id: Option<i64>) -> Result<()> {
+pub async fn submissions(config: &Config, id: Option<i64>, json: bool) -> Result<()> {
     let client = participant(config)?;
     if let Some(id) = id {
         let s: SubmissionInfo = client.get(&format!("/api/submissions/{id}")).await?;
+        if json {
+            return format::print_json(&s);
+        }
         print_result(&s);
         return Ok(());
     }
     let list: Vec<SubmissionInfo> = client.get("/api/me/submissions").await?;
+    if json {
+        return format::print_json(&list);
+    }
     if list.is_empty() {
         println!("No submissions in the current round.");
     }
@@ -477,7 +590,10 @@ pub async fn submissions(config: &Config, id: Option<i64>) -> Result<()> {
 /// Runs a build command in the build image, which matches the judge's environment.
 pub fn build(image: &str, command: &[String]) -> Result<bool> {
     if command.is_empty() {
-        bail!("give the build command after `--`, e.g. `arena build -- gcc -O2 -o sol sol.c`");
+        return Err(UsageError(
+            "give the build command after `--`, e.g. `arena build -- gcc -O2 -o sol sol.c`".into(),
+        )
+        .into());
     }
     let cwd = std::env::current_dir()?;
     let mut docker = std::process::Command::new("docker");
