@@ -3,6 +3,7 @@
 use arena_protocol::{CreateRound, ExtendRound, RoundInfo, RoundState};
 use axum::Json;
 use axum::extract::{Path, State};
+use axum::http::StatusCode;
 
 use crate::auth::Admin;
 use crate::error::{ApiError, ApiResult};
@@ -235,6 +236,61 @@ pub async fn create(
     }
     tx.commit().await?;
     Ok(Json(info(&state, find_row(&state, id).await?, true).await?))
+}
+
+/// `DELETE /api/admin/rounds/{id}`: removes a draft or finished round.
+pub async fn remove(
+    _: Admin,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    let round = find_row(&state, id).await?;
+    if round.state(now()) == RoundState::Running {
+        return Err(ApiError::conflict(format!("round {id} is still running")));
+    }
+
+    let active: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM submissions
+         WHERE round_id = ? AND status IN ('queued', 'judging')",
+    )
+    .bind(id)
+    .fetch_one(&state.db)
+    .await?;
+    if active > 0 {
+        return Err(ApiError::conflict(
+            "round still has submissions waiting to be judged",
+        ));
+    }
+
+    let submission_ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id FROM submissions WHERE round_id = ?")
+            .bind(id)
+            .fetch_all(&state.db)
+            .await?;
+    let mut tx = state.db.begin().await?;
+    sqlx::query("DELETE FROM submissions WHERE round_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM round_problems WHERE round_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM rounds WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    for submission_id in submission_ids {
+        if let Err(error) =
+            tokio::fs::remove_dir_all(crate::submissions::dir(&state, submission_id)).await
+        {
+            tracing::warn!(submission = submission_id, %error, "could not remove submission files");
+        }
+    }
+    tracing::info!(round = id, "round removed");
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `POST /api/admin/rounds/{id}/start`: starts the clock. Only one round may run at a time.

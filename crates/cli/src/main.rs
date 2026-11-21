@@ -175,6 +175,10 @@ async fn run(cli: Cli) -> Result<bool> {
                     let minutes: u32 = ask::required("Minutes to add", "<MINUTES>", minutes)?;
                     admin::round_action(&c, id, "extend", Some(minutes)).await?
                 }
+                AdminCommand::Round(RoundCommand::Delete { id }) => {
+                    let id = round_id(&c, id).await?;
+                    admin::round_delete(&c, id).await?
+                }
                 AdminCommand::Submissions { round, json } => {
                     admin::submissions(&c, round, json).await?
                 }

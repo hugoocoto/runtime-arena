@@ -1,8 +1,11 @@
 #!/bin/sh
-# Validate the host, update the pinned images, start Arena and wait for HTTPS.
+# Update the checkout and images, validate the host, start Arena and wait for HTTPS.
 set -eu
 cd "$(dirname "$0")/.."
 
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git pull --ff-only
+fi
 scripts/host-preflight.sh
 docker compose pull
 docker compose up -d
