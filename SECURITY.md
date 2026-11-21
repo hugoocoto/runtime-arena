@@ -21,6 +21,11 @@ Other measures:
 
 - The judge never follows a link a program leaves in place of its output, and
   hands custom checkers a private copy of the output.
+- Each box's working directory is a size-limited tmpfs (`ARENA_DISK_MB`, default
+  512 MiB), so a submission cannot fill the host disk. A per-file output limit
+  applies on top of it.
+- A submission may create up to `ARENA_PROCESSES` processes and threads (default
+  64); the cgroup memory limit and CPU accounting cover the whole tree.
 - Wrong-answer messages quote the expected answer only for sample tests, so
   hidden answers can't be read back token by token.
 - Tokens are random 256-bit values stored as SHA-256; the admin token and the

@@ -40,8 +40,8 @@ impl JudgeBackend for FakeJudge {
                 let r = TestResult {
                     name: t.name.clone(),
                     verdict,
-                    time_ms: 7,
-                    wall_time_ms: 8,
+                    time_us: 7,
+                    wall_time_us: 8,
                     memory_kib: 2048,
                     message: (verdict != Verdict::Accepted).then(|| "token 1: expected 30".into()),
                 };
@@ -62,6 +62,10 @@ async fn start_server(data: &Path) -> String {
         judge_boxes: vec![0],
         isolate: "isolate".into(),
         runs_per_test: 1,
+        processes: 64,
+        max_failures: 3,
+        cg_root: "/sys/fs/cgroup/isolate".into(),
+        box_storage: None,
         update_check: false,
         rate_limit: 0,
     };

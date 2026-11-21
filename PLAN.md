@@ -58,16 +58,28 @@ runtime-arena/
 ## Judging
 
 - In-process worker pool: N workers, each pinned to a dedicated CPU core.
-- Tests of a submission run in sequence; each hidden test runs **K times**, and
-  the lowest CPU time is kept. Peak memory is the program's peak RSS.
+- Tests of a submission run in sequence. Each accepted test runs **K times**, and
+  the lowest CPU time is kept.
+- A submission may create up to `ARENA_PROCESSES` processes and threads (default
+  64), so OpenMP, pthreads and multi-process programs work. The cgroup memory
+  limit and CPU accounting cover the whole process tree. Multi-node MPI is not
+  supported: the sandbox has no network.
+- Judging stops after `ARENA_MAX_FAILURES` failing tests (default 3, 0 runs every
+  test), so a wrong or slow submission doesn't occupy a worker for long.
+- Peak memory is the sandbox cgroup's peak, so child processes count; it includes
+  the file cache of written output. The per-file output limit is separate.
+- Each box's working directory is a size-limited tmpfs (`ARENA_DISK_MB`, default
+  512 MiB), so a submission cannot fill the host disk.
 - Checker: token-based comparison by default; a problem may ship a custom checker
   executable.
 - Per-user submission cooldown, configurable per round.
-- Stored per test: verdict, CPU time, wall time, peak memory (the program's peak
-  RSS; the cgroup enforces the limit but its usage includes file cache).
+- Stored per test: verdict, CPU time in microseconds (from the cgroup's
+  `usage_usec`), wall time, peak memory.
 
 Board defaults (open to change):
 - Time metric = max CPU time across tests; memory metric = max peak memory across tests.
+- Times are ranked at microsecond precision, so parallel programs and fast tests
+  don't tie at a millisecond.
 - Ties are broken by the other metric, then by the earliest submission.
 - Best time and best memory may come from different accepted submissions.
 
@@ -159,10 +171,12 @@ arena completions <shell>
    P-core: min 0.103 s, median 0.105 s, max 0.128 s over 30 runs, so K≥3 is
    worthwhile. E-cores are ~50% slower; pin to P-cores only.
 2. ~~`judge` crate~~ done: run a binary against tests, produce verdict, time and memory.
-   Every test runs (the report names each failing test); accepted tests are
-   repeated `runs_per_test` times (default 3) and keep the best time and memory;
-   each run gets a fresh box. Single process (`--processes=1`). Custom checkers
-   use the testlib convention (`checker in out ans`, exit 0 = AC, 1/2 = WA).
+   Accepted tests are repeated `runs_per_test` times (default 3) and keep the
+   best time and memory; each run gets a fresh box. Judging stops after
+   `max_failures` failing tests (default 3). Up to `ARENA_PROCESSES` processes
+   and threads (default 64); CPU time comes from the cgroup in microseconds.
+   Custom checkers use the testlib convention (`checker in out ans`, exit 0 = AC,
+   1/2 = WA).
 3. ~~`server`~~ done: schema and migrations, token auth, admin API for users,
    problems and rounds, submission intake (ELF x86-64 / `#!` checks, cooldown,
    source required), in-process workers (one per `JUDGE_CPUS` entry, box `i` on

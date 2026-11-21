@@ -29,7 +29,7 @@ struct Accepted {
     submission_id: i64,
     user: String,
     display_name: String,
-    time_ms: i64,
+    time_us: i64,
     memory_kib: i64,
     submitted_at: i64,
 }
@@ -43,7 +43,7 @@ async fn accepted(
     Ok(sqlx::query_as!(
         Accepted,
         r#"SELECT s.id AS submission_id, u.name AS user, u.display_name,
-                  s.time_ms AS "time_ms!", s.memory_kib AS "memory_kib!", s.submitted_at
+                  s.time_us AS "time_us!", s.memory_kib AS "memory_kib!", s.submitted_at
            FROM submissions s JOIN users u ON u.id = s.user_id
            WHERE s.round_id = ? AND s.problem_id = ? AND s.status = 'done'
              AND s.verdict = 'accepted' AND s.submitted_at < ?
@@ -92,10 +92,10 @@ pub(crate) async fn board(
     .collect();
 
     let by_time = rank(&accepted, &attempts, |a| {
-        (a.time_ms, a.memory_kib, a.submitted_at)
+        (a.time_us, a.memory_kib, a.submitted_at)
     });
     let by_memory = rank(&accepted, &attempts, |a| {
-        (a.memory_kib, a.time_ms, a.submitted_at)
+        (a.memory_kib, a.time_us, a.submitted_at)
     });
     Ok(Board {
         round_id: round.id,
@@ -127,7 +127,7 @@ fn rank(
             rank: i as u32 + 1,
             user: a.user.clone(),
             display_name: a.display_name.clone(),
-            time_ms: a.time_ms as u64,
+            time_us: a.time_us as u64,
             memory_kib: a.memory_kib as u64,
             submission_id: a.submission_id,
             submitted_at: a.submitted_at,
@@ -179,7 +179,7 @@ pub async fn accepted_history(
                 submission_id: a.submission_id,
                 user: a.user,
                 display_name: a.display_name,
-                time_ms: a.time_ms as u64,
+                time_us: a.time_us as u64,
                 memory_kib: a.memory_kib as u64,
                 submitted_at: a.submitted_at,
             })
@@ -191,12 +191,12 @@ pub async fn accepted_history(
 mod tests {
     use super::*;
 
-    fn acc(id: i64, user: &str, time_ms: i64, memory_kib: i64, at: i64) -> Accepted {
+    fn acc(id: i64, user: &str, time_us: i64, memory_kib: i64, at: i64) -> Accepted {
         Accepted {
             submission_id: id,
             user: user.into(),
             display_name: user.into(),
-            time_ms,
+            time_us,
             memory_kib,
             submitted_at: at,
         }
@@ -213,7 +213,7 @@ mod tests {
         let attempts = HashMap::from([("ann".to_owned(), 3), ("bob".to_owned(), 1)]);
 
         let t = rank(&subs, &attempts, |a| {
-            (a.time_ms, a.memory_kib, a.submitted_at)
+            (a.time_us, a.memory_kib, a.submitted_at)
         });
         let order: Vec<_> = t
             .iter()
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(t[1].attempts, 3);
 
         let m = rank(&subs, &attempts, |a| {
-            (a.memory_kib, a.time_ms, a.submitted_at)
+            (a.memory_kib, a.time_us, a.submitted_at)
         });
         let order: Vec<_> = m
             .iter()

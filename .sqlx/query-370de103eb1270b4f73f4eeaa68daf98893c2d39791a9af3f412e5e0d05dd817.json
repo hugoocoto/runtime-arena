@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT s.id AS submission_id, u.name AS user, u.display_name,\n                  s.time_ms AS \"time_ms!\", s.memory_kib AS \"memory_kib!\", s.submitted_at\n           FROM submissions s JOIN users u ON u.id = s.user_id\n           WHERE s.round_id = ? AND s.problem_id = ? AND s.status = 'done'\n             AND s.verdict = 'accepted' AND s.submitted_at < ?\n           ORDER BY s.submitted_at, s.id",
+  "query": "SELECT s.id AS submission_id, u.name AS user, u.display_name,\n                  s.time_us AS \"time_us!\", s.memory_kib AS \"memory_kib!\", s.submitted_at\n           FROM submissions s JOIN users u ON u.id = s.user_id\n           WHERE s.round_id = ? AND s.problem_id = ? AND s.status = 'done'\n             AND s.verdict = 'accepted' AND s.submitted_at < ?\n           ORDER BY s.submitted_at, s.id",
   "describe": {
     "columns": [
       {
@@ -37,13 +37,13 @@
         }
       },
       {
-        "name": "time_ms!",
+        "name": "time_us!",
         "ordinal": 3,
         "type_info": "Integer",
         "origin": {
           "Table": {
             "table": "submissions",
-            "name": "time_ms"
+            "name": "time_us"
           }
         }
       },
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "78c6681b8197c4fa86d97bd1959afd29a31d98e59835e3e130051c1dc3428f18"
+  "hash": "370de103eb1270b4f73f4eeaa68daf98893c2d39791a9af3f412e5e0d05dd817"
 }

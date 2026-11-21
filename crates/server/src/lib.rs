@@ -104,6 +104,20 @@ pub async fn open_db(data_dir: &Path) -> Result<SqlitePool, sqlx::Error> {
 
 /// Starts the judge workers and the round clock. Call once per process.
 pub async fn start_background(state: &AppState) -> Result<(), sqlx::Error> {
+    if let Some(dir) = &state.config.box_storage
+        && !dir.is_dir()
+    {
+        tracing::warn!(
+            dir = %dir.display(),
+            "per-box storage is missing; submissions are not disk-limited"
+        );
+    }
+    if !state.config.cg_root.is_dir() {
+        tracing::warn!(
+            dir = %state.config.cg_root.display(),
+            "cgroup root is missing; CPU times fall back to isolate's milliseconds"
+        );
+    }
     queue::requeue_interrupted(state).await?;
     for &box_id in &state.config.judge_boxes {
         tokio::spawn(queue::worker(state.clone(), box_id));

@@ -135,6 +135,13 @@ ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scr
   `JUDGE_CPUS=0,2,4,6`. The same binary measured ~0.105 s on a P-core and
   ~0.163 s on an E-core there.
 - Each accepted test runs 3 times and the best time counts (`ARENA_RUNS_PER_TEST`).
+- Times come from the sandbox cgroup in microseconds, so threads and child
+  processes are counted in the total CPU time.
+- A submission may create up to 64 processes and threads (`ARENA_PROCESSES`), so
+  OpenMP, pthreads and multi-process programs work. Multi-node MPI is not
+  supported because the sandbox has no network.
+- Each box gets a size-limited tmpfs for its files (`ARENA_DISK_MB`, default
+  512 MiB), so a runaway program cannot fill the host disk.
 - Run `scripts/host-tuning.sh` to see settings that reduce noise (CPU governor,
   turbo, SMT, ...), and `sudo scripts/host-tuning.sh --apply` on a dedicated machine.
 

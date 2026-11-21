@@ -507,7 +507,7 @@ async fn follow(
                     test_count,
                     result.name,
                     format::verdict(result.verdict),
-                    format::time(result.time_ms),
+                    format::time(result.time_us),
                     format::memory(result.memory_kib),
                 );
                 std::io::stdout().flush().ok();
@@ -532,7 +532,7 @@ async fn poll(client: &Client, id: i64) -> Result<SubmissionInfo> {
 
 pub fn print_result(s: &SubmissionInfo) {
     let verdict = s.verdict.map(format::verdict).unwrap_or("not judged");
-    match (s.verdict, s.time_ms, s.memory_kib) {
+    match (s.verdict, s.time_us, s.memory_kib) {
         (Some(Verdict::Accepted), Some(t), Some(m)) => println!(
             "Submission {}: accepted — {} CPU, {} memory (slowest test, peak memory).",
             s.id,
@@ -576,7 +576,7 @@ pub async fn submissions(config: &Config, id: Option<i64>, json: bool) -> Result
             SubmissionStatus::Judging => "judging",
             _ => s.verdict.map(format::verdict).unwrap_or("?"),
         };
-        let numbers = match (s.time_ms, s.memory_kib) {
+        let numbers = match (s.time_us, s.memory_kib) {
             (Some(t), Some(m)) if s.verdict == Some(Verdict::Accepted) => {
                 format!("{} {}", format::time(t), format::memory(m))
             }

@@ -16,6 +16,8 @@ pub struct Limits {
     pub memory_kib: u64,
     /// Largest file the program may write (its stdout included), in KiB.
     pub output_kib: u64,
+    /// Processes and threads the program may create.
+    pub processes: u32,
 }
 
 /// What isolate reported about one run (its meta file).
@@ -26,11 +28,15 @@ pub struct RunMeta {
     pub exit_code: Option<i32>,
     pub exit_signal: Option<i32>,
     pub oom_killed: bool,
+    /// CPU time of the whole sandbox (all processes and threads). Isolate
+    /// reports milliseconds; the judge replaces this with the cgroup's
+    /// microsecond counter when it is available.
     pub time: Duration,
     pub wall_time: Duration,
-    /// Memory charged to the box's control group (includes file cache of written output).
+    /// Peak memory charged to the box's control group, in KiB (includes file
+    /// cache of written output).
     pub cg_mem_kib: u64,
-    /// Peak resident set size of the program.
+    /// Peak resident set size of the main process.
     pub max_rss_kib: u64,
     pub message: Option<String>,
 }
@@ -69,14 +75,31 @@ impl RunMeta {
 pub struct Sandbox {
     isolate: PathBuf,
     box_id: u32,
+    /// Isolate's cgroup root, used for microsecond CPU accounting.
+    cg_root: PathBuf,
+    /// Per-box tmpfs prepared by the entrypoint, if it exists.
+    storage: Option<PathBuf>,
 }
 
 impl Sandbox {
-    pub fn new(isolate: impl Into<PathBuf>, box_id: u32) -> Self {
+    pub fn new(
+        isolate: impl Into<PathBuf>,
+        box_id: u32,
+        cg_root: impl Into<PathBuf>,
+        storage: Option<PathBuf>,
+    ) -> Self {
         Sandbox {
             isolate: isolate.into(),
             box_id,
+            cg_root: cg_root.into(),
+            storage,
         }
+    }
+
+    /// The size-limited directory for this box, when the entrypoint mounted one.
+    fn storage_dir(&self) -> Option<PathBuf> {
+        let dir = self.storage.as_ref()?.join(format!("box-{}", self.box_id));
+        dir.is_dir().then_some(dir)
     }
 
     fn command(&self) -> Command {
@@ -105,7 +128,9 @@ impl Sandbox {
             )));
         }
         let root = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-        Ok(Path::new(&root).join("box"))
+        Ok(self
+            .storage_dir()
+            .unwrap_or_else(|| Path::new(&root).join("box")))
     }
 
     pub async fn cleanup(&self) -> Result<(), Error> {
@@ -121,7 +146,23 @@ impl Sandbox {
                 String::from_utf8_lossy(&out.stderr).trim()
             )));
         }
+        if let Some(dir) = self.storage_dir() {
+            clear_dir(&dir).await?;
+        }
         Ok(())
+    }
+
+    /// Total CPU time of the box's cgroup, in microseconds. `None` when isolate's
+    /// cgroup root is not visible from here.
+    async fn cpu_usage_usec(&self) -> Option<u64> {
+        let path = self
+            .cg_root
+            .join(format!("box-{}", self.box_id))
+            .join("cpu.stat");
+        let text = tokio::fs::read_to_string(path).await.ok()?;
+        text.lines()
+            .find_map(|l| l.strip_prefix("usage_usec "))
+            .and_then(|v| v.trim().parse().ok())
     }
 
     /// Runs `./program` in the box with `stdin_file` as input, writing stdout to `stdout_file`.
@@ -135,8 +176,11 @@ impl Sandbox {
         limits: &Limits,
     ) -> Result<RunMeta, Error> {
         let time = limits.time.as_secs_f64();
-        let out = self
-            .command()
+        // The cgroup is cumulative across runs in one box; take a baseline so the
+        // difference is this run's CPU time, with microsecond precision.
+        let before = self.cpu_usage_usec().await;
+        let mut command = self.command();
+        command
             .arg("--silent")
             .arg(format!("--meta={}", meta_file.display()))
             .arg(format!("--time={time:.3}"))
@@ -147,11 +191,17 @@ impl Sandbox {
             .arg(format!("--wall-time={:.3}", time * 3.0 + 1.0))
             .arg(format!("--cg-mem={}", limits.memory_kib))
             .arg(format!("--fsize={}", limits.output_kib))
-            .arg("--processes=1")
+            .arg(format!("--processes={}", limits.processes))
             .arg("--env=PATH=/usr/local/bin:/usr/bin:/bin")
             .arg(format!("--stdin={stdin_file}"))
             .arg(format!("--stdout={stdout_file}"))
-            .arg("--stderr=/dev/null")
+            .arg("--stderr=/dev/null");
+        if let Some(dir) = self.storage_dir() {
+            // The entrypoint mounts this tmpfs with a size limit, so the program
+            // cannot fill the host disk.
+            command.arg(format!("--dir=/box={}:rw", dir.display()));
+        }
+        let out = command
             .arg("--run")
             .arg("--")
             .arg(format!("./{program}"))
@@ -173,8 +223,36 @@ impl Sandbox {
         let text = tokio::fs::read_to_string(meta_file)
             .await
             .map_err(|e| Error::io(meta_file, e))?;
-        RunMeta::parse(&text).map_err(Error::Sandbox)
+        let mut meta = RunMeta::parse(&text).map_err(Error::Sandbox)?;
+        if let (Some(before), Some(after)) = (before, self.cpu_usage_usec().await)
+            && after >= before
+        {
+            meta.time = Duration::from_micros(after - before);
+        }
+        Ok(meta)
     }
+}
+
+/// Removes everything inside `dir`, keeping the directory itself (it is a mount point).
+async fn clear_dir(dir: &Path) -> Result<(), Error> {
+    let mut entries = tokio::fs::read_dir(dir)
+        .await
+        .map_err(|e| Error::io(dir, e))?;
+    while let Some(entry) = entries.next_entry().await.map_err(|e| Error::io(dir, e))? {
+        let path = entry.path();
+        let kind = tokio::fs::symlink_metadata(&path)
+            .await
+            .map_err(|e| Error::io(&path, e))?
+            .file_type();
+        let removed = if kind.is_dir() {
+            tokio::fs::remove_dir_all(&path).await
+        } else {
+            // Also removes symlinks, without following them.
+            tokio::fs::remove_file(&path).await
+        };
+        removed.map_err(|e| Error::io(&path, e))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

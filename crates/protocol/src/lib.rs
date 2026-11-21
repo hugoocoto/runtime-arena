@@ -46,24 +46,28 @@ pub struct TestResult {
     /// Test name, e.g. "01" for `tests/01.in`.
     pub name: String,
     pub verdict: Verdict,
-    /// CPU time in milliseconds.
-    pub time_ms: u64,
-    pub wall_time_ms: u64,
-    /// Peak resident memory of the program, in KiB.
+    /// CPU time in microseconds, from the sandbox's cgroup accounting.
+    pub time_us: u64,
+    /// Wall-clock time in microseconds.
+    pub wall_time_us: u64,
+    /// Peak memory of the sandbox, in KiB: the whole process tree when the
+    /// kernel reports it, otherwise the main process's peak RSS.
     pub memory_kib: u64,
     /// Detail for non-accepted verdicts (exit code, signal, checker comment).
     pub message: Option<String>,
 }
 
-/// Result of judging a submission against every test of a problem.
+/// Result of judging a submission against the tests of a problem.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct JudgeReport {
     /// Accepted if every test is accepted, otherwise the verdict of the first failed test.
     pub verdict: Verdict,
-    /// Largest CPU time over all tests, in milliseconds.
-    pub time_ms: u64,
+    /// Largest CPU time over all tests, in microseconds.
+    pub time_us: u64,
     /// Largest peak memory over all tests, in KiB.
     pub memory_kib: u64,
+    /// The tests that ran. Judging stops after the configured number of
+    /// failures, so this can be shorter than the problem's test count.
     pub tests: Vec<TestResult>,
 }
 
@@ -76,7 +80,7 @@ impl JudgeReport {
             .unwrap_or(Verdict::Accepted);
         JudgeReport {
             verdict,
-            time_ms: tests.iter().map(|t| t.time_ms).max().unwrap_or(0),
+            time_us: tests.iter().map(|t| t.time_us).max().unwrap_or(0),
             memory_kib: tests.iter().map(|t| t.memory_kib).max().unwrap_or(0),
             tests,
         }
@@ -211,7 +215,7 @@ pub struct SubmissionInfo {
     pub problem_version: i64,
     pub status: SubmissionStatus,
     pub verdict: Option<Verdict>,
-    pub time_ms: Option<u64>,
+    pub time_us: Option<u64>,
     pub memory_kib: Option<u64>,
     /// Unix time in seconds.
     pub submitted_at: i64,
@@ -226,7 +230,7 @@ pub struct BoardEntry {
     pub rank: u32,
     pub user: String,
     pub display_name: String,
-    pub time_ms: u64,
+    pub time_us: u64,
     pub memory_kib: u64,
     /// Submission that set this result.
     pub submission_id: i64,
@@ -278,7 +282,7 @@ pub struct AcceptedSubmission {
     pub submission_id: i64,
     pub user: String,
     pub display_name: String,
-    pub time_ms: u64,
+    pub time_us: u64,
     pub memory_kib: u64,
     pub submitted_at: i64,
 }
@@ -308,12 +312,12 @@ pub enum ServerEvent {
 mod tests {
     use super::*;
 
-    fn test(name: &str, verdict: Verdict, time_ms: u64, memory_kib: u64) -> TestResult {
+    fn test(name: &str, verdict: Verdict, time_us: u64, memory_kib: u64) -> TestResult {
         TestResult {
             name: name.into(),
             verdict,
-            time_ms,
-            wall_time_ms: time_ms,
+            time_us,
+            wall_time_us: time_us,
             memory_kib,
             message: None,
         }
@@ -326,7 +330,7 @@ mod tests {
             test("02", Verdict::Accepted, 30, 500),
         ]);
         assert_eq!(r.verdict, Verdict::Accepted);
-        assert_eq!((r.time_ms, r.memory_kib), (30, 900));
+        assert_eq!((r.time_us, r.memory_kib), (30, 900));
         assert!(r.first_failure().is_none());
     }
 
