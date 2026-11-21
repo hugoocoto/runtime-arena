@@ -22,7 +22,14 @@ RUN apt-get update \
 
 FROM base AS build-env
 RUN apt-get update \
- && apt-get install -y --no-install-recommends gcc g++ libc6-dev make git \
+ && apt-get install -y --no-install-recommends gcc g++ libc6-dev make git cargo rustc curl xz-utils \
+ && curl -fsSL -o /tmp/zig.tar.xz \
+      https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz \
+ && echo '24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c  /tmp/zig.tar.xz' \
+      | sha256sum -c - \
+ && tar -xJf /tmp/zig.tar.xz -C /opt \
+ && ln -s /opt/zig-x86_64-linux-0.14.1/zig /usr/local/bin/zig \
+ && rm -f /tmp/zig.tar.xz \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /work
 CMD ["bash"]

@@ -3,7 +3,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.sh | sh
 #
-# PREFIX   install location (default ~/.local; sudo is used only if it isn't writable)
+# PREFIX   install prefix (default /usr/local; sudo is used if it isn't writable)
 # VERSION  release to install, e.g. 0.6.0 (default: the latest)
 set -eu
 
@@ -17,8 +17,7 @@ die() {
 if [ -n "${PREFIX:-}" ]; then
     prefix=$PREFIX
 else
-    [ -n "${HOME:-}" ] || die "HOME is not set; set PREFIX"
-    prefix=$HOME/.local
+    prefix=/usr/local
 fi
 
 for tool in curl tar install; do
