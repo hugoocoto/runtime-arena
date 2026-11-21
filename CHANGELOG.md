@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/hugoocoto/runtime-arena/compare/v0.4.0...v0.5.0) (2026-11-21)
+
+
+### Features
+
+* add CLI prompts and update notices, bind tokens to their server ([#11](https://github.com/hugoocoto/runtime-arena/issues/11)) ([1bd0261](https://github.com/hugoocoto/runtime-arena/commit/1bd02611c9ab3102b64aa5546a6e85824c512718))
+
 ## [0.4.0](https://github.com/hugoocoto/runtime-arena/compare/v0.3.0...v0.4.0) (2026-11-21)
 
 
