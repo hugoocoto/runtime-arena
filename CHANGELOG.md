@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/hugoocoto/runtime-arena/compare/v0.7.0...v0.8.0) (2026-11-21)
+
+
+### Features
+
+* **judge:** support parallel submissions and resource limits ([#17](https://github.com/hugoocoto/runtime-arena/issues/17)) ([ad3bd3d](https://github.com/hugoocoto/runtime-arena/commit/ad3bd3d95f8c14c29757b92d55c472e3e9060c1a))
+
 ## [0.7.0](https://github.com/hugoocoto/runtime-arena/compare/v0.6.0...v0.7.0) (2026-11-21)
 
 
