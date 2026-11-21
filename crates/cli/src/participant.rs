@@ -38,24 +38,33 @@ pub fn participant(config: &Config) -> Result<Client> {
 /// password of the account created on the server's `/join` page.
 pub async fn login(server: Option<&str>, token: Option<&str>, admin: bool) -> Result<()> {
     let mut config = Config::load_file()?;
+    if admin {
+        let file = crate::config::dotenv()?;
+        let (server, token) = admin_target(
+            server,
+            token,
+            config.server.as_deref(),
+            |k| std::env::var(k).ok().filter(|v| !v.is_empty()),
+            |k| file.get(k).cloned(),
+        )?;
+        Client::new(&server, Some(token.clone()))?
+            .get::<Vec<UserInfo>>("/api/admin/users")
+            .await
+            .with_context(|| format!("could not verify the admin token on {server}"))?;
+        config.admin_token = Some(token);
+        println!("Admin token verified on {server}.");
+        config.server = Some(server);
+        config.save()?;
+        return Ok(());
+    }
     let server = match server {
         Some(s) => crate::client::normalise_server(s),
         None => Config::load()?
             .server
             .context("give the server address, e.g. `arena login http://arena.local:8080`")?,
     };
-    match (token, admin) {
-        (Some(token), true) => {
-            let client = Client::new(&server, Some(token.to_owned()))?;
-            client
-                .get::<Vec<UserInfo>>("/api/admin/users")
-                .await
-                .context("the admin token was refused")?;
-            config.admin_token = Some(token.to_owned());
-            println!("Admin token verified.");
-        }
-        (None, true) => bail!("give the admin token: `arena login --admin <server> <token>`"),
-        (Some(token), false) => {
+    match token {
+        Some(token) => {
             let client = Client::new(&server, Some(token.to_owned()))?;
             let me: UserInfo = client
                 .get("/api/me")
@@ -64,7 +73,7 @@ pub async fn login(server: Option<&str>, token: Option<&str>, admin: bool) -> Re
             config.token = Some(token.to_owned());
             println!("Logged in as {} ({}).", me.display_name, me.name);
         }
-        (None, false) => {
+        None => {
             let name = prompt("Username: ")?;
             let password = rpassword::prompt_password("Password: ")?;
             let client = Client::new(&server, None)?;
@@ -84,6 +93,75 @@ pub async fn login(server: Option<&str>, token: Option<&str>, admin: bool) -> Re
     config.server = Some(server);
     config.save()?;
     Ok(())
+}
+
+/// Picks the server and token for `login --admin`. A `.env` marks this machine
+/// as the host, so the server defaults to localhost on `ARENA_PORT`. A token
+/// read from `.env` is only ever sent to a loopback address.
+fn admin_target(
+    server: Option<&str>,
+    token: Option<&str>,
+    saved_server: Option<&str>,
+    env: impl Fn(&str) -> Option<String>,
+    dotenv: impl Fn(&str) -> Option<String>,
+) -> Result<(String, String)> {
+    let env_token = env("ARENA_ADMIN_TOKEN");
+    let file_token = dotenv("ARENA_ADMIN_TOKEN");
+    let server = match server.map(str::to_owned).or_else(|| env("ARENA_SERVER")) {
+        Some(s) => crate::client::normalise_server(&s),
+        None if file_token.is_some() => local_server(&env, &dotenv)?,
+        None => match saved_server {
+            Some(s) => s.to_owned(),
+            None if token.is_some() || env_token.is_some() => local_server(&env, &dotenv)?,
+            None => bail!(
+                "no admin token found: set ARENA_ADMIN_TOKEN, run from the directory with \
+                 the host's .env, or use `arena login --admin <server> <token>`"
+            ),
+        },
+    };
+    let token = token.map(str::to_owned).or(env_token);
+    let token = match (token, file_token) {
+        (Some(t), _) => t,
+        (None, Some(t)) if is_loopback(&server) => t,
+        (None, Some(_)) => bail!(
+            "not sending the token from .env to {server}, which is not this machine; \
+             use `arena login --admin <server> <token>`"
+        ),
+        (None, None) => bail!(
+            "no admin token found: set ARENA_ADMIN_TOKEN, run from the directory with \
+             the host's .env, or use `arena login --admin <server> <token>`"
+        ),
+    };
+    Ok((server, token))
+}
+
+fn local_server(
+    env: &impl Fn(&str) -> Option<String>,
+    dotenv: &impl Fn(&str) -> Option<String>,
+) -> Result<String> {
+    let port = env("ARENA_PORT")
+        .or_else(|| dotenv("ARENA_PORT"))
+        .unwrap_or_else(|| "8080".into());
+    // Compose also accepts `127.0.0.1:8080` here.
+    let number = port.rsplit(':').next().unwrap_or(&port);
+    let number: u16 = number
+        .parse()
+        .with_context(|| format!("ARENA_PORT is not a port: {port}"))?;
+    Ok(format!("http://localhost:{number}"))
+}
+
+fn is_loopback(server: &str) -> bool {
+    let Ok(url) = reqwest::Url::parse(server) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .trim_matches(['[', ']'])
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
 }
 
 fn prompt(label: &str) -> Result<String> {
@@ -411,6 +489,95 @@ fn id_flag(flag: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn vars<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        |k| {
+            pairs
+                .iter()
+                .find(|(name, _)| *name == k)
+                .map(|(_, v)| (*v).to_owned())
+        }
+    }
+
+    #[test]
+    fn admin_login_on_the_host_uses_dotenv() {
+        let file = [("ARENA_ADMIN_TOKEN", "secret"), ("ARENA_PORT", "9000")];
+        let got = admin_target(
+            None,
+            None,
+            Some("http://remote:8080"),
+            vars(&[]),
+            vars(&file),
+        );
+        assert_eq!(
+            got.unwrap(),
+            ("http://localhost:9000".to_owned(), "secret".to_owned())
+        );
+    }
+
+    #[test]
+    fn admin_login_environment_beats_dotenv() {
+        let env = [("ARENA_ADMIN_TOKEN", "from-env"), ("ARENA_PORT", "7000")];
+        let file = [("ARENA_ADMIN_TOKEN", "from-file"), ("ARENA_PORT", "9000")];
+        let got = admin_target(None, None, None, vars(&env), vars(&file)).unwrap();
+        assert_eq!(got, ("http://localhost:7000".into(), "from-env".into()));
+    }
+
+    #[test]
+    fn admin_login_without_dotenv_keeps_saved_server() {
+        let env = [("ARENA_ADMIN_TOKEN", "t")];
+        let got = admin_target(
+            None,
+            None,
+            Some("http://remote:8080"),
+            vars(&env),
+            vars(&[]),
+        );
+        assert_eq!(got.unwrap().0, "http://remote:8080");
+    }
+
+    #[test]
+    fn dotenv_token_never_goes_to_a_remote_server() {
+        let file = [("ARENA_ADMIN_TOKEN", "secret")];
+        assert!(
+            admin_target(
+                Some("arena.example:8080"),
+                None,
+                None,
+                vars(&[]),
+                vars(&file)
+            )
+            .is_err()
+        );
+        let env = [("ARENA_SERVER", "http://arena.example:8080")];
+        assert!(admin_target(None, None, None, vars(&env), vars(&file)).is_err());
+        assert!(admin_target(Some("127.0.0.1:8080"), None, None, vars(&[]), vars(&file)).is_ok());
+        assert!(admin_target(Some("[::1]:8080"), None, None, vars(&[]), vars(&file)).is_ok());
+        assert!(!is_loopback("http://localhost.example:8080"));
+    }
+
+    #[test]
+    fn admin_login_with_only_a_token_defaults_to_localhost() {
+        let got = admin_target(None, Some("t"), None, vars(&[]), vars(&[])).unwrap();
+        assert_eq!(got, ("http://localhost:8080".into(), "t".into()));
+    }
+
+    #[test]
+    fn admin_login_without_a_token_fails() {
+        assert!(admin_target(None, None, Some("http://r:1"), vars(&[]), vars(&[])).is_err());
+    }
+
+    #[test]
+    fn dotenv_parsing() {
+        let parsed = crate::config::parse_dotenv(
+            "# comment\nA=1\nexport B=\"two words\"\nC='x' # note\nD=y # note\nEMPTY=\nnot a pair\n",
+        );
+        assert_eq!(parsed["A"], "1");
+        assert_eq!(parsed["B"], "two words");
+        assert_eq!(parsed["C"], "x");
+        assert_eq!(parsed["D"], "y");
+        assert_eq!(parsed.len(), 4);
+    }
 
     #[test]
     fn source_archive_skips_build_dirs() {

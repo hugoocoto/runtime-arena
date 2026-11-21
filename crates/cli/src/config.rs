@@ -1,6 +1,8 @@
 //! `~/.config/arena/config.toml`: server URL and tokens. Environment variables
 //! `ARENA_SERVER`, `ARENA_TOKEN` and `ARENA_ADMIN_TOKEN` override it.
+//! `arena login --admin` also reads the host's `./.env` (see [`dotenv`]).
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, anyhow};
@@ -60,6 +62,42 @@ impl Config {
             .as_deref()
             .ok_or_else(|| anyhow!("no server configured; run `arena login <server> <token>`"))
     }
+}
+
+/// The non-empty values in `./.env`; empty if there is no such file.
+pub fn dotenv() -> Result<HashMap<String, String>> {
+    match std::fs::read_to_string(".env") {
+        Ok(text) => Ok(parse_dotenv(&text)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(HashMap::new()),
+        Err(e) => Err(e).context("reading ./.env"),
+    }
+}
+
+/// Parses `KEY=value` lines, with optional `export`, quotes and `#` comments.
+pub fn parse_dotenv(text: &str) -> HashMap<String, String> {
+    text.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.starts_with('#') {
+                return None;
+            }
+            let (key, value) = line
+                .strip_prefix("export ")
+                .unwrap_or(line)
+                .split_once('=')?;
+            let value = value.trim();
+            let quoted = ['"', '\'']
+                .into_iter()
+                .find_map(|q| value.strip_prefix(q)?.split_once(q).map(|(inner, _)| inner));
+            let value = quoted.unwrap_or_else(|| {
+                value
+                    .split_once(" #")
+                    .map_or(value, |(before, _)| before)
+                    .trim_end()
+            });
+            (!value.is_empty()).then(|| (key.trim().to_owned(), value.to_owned()))
+        })
+        .collect()
 }
 
 #[cfg(unix)]

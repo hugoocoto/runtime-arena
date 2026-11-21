@@ -24,7 +24,8 @@ enum Command {
         server: Option<String>,
         /// A token from the organiser, instead of username and password.
         token: Option<String>,
-        /// Save the token as the admin token.
+        /// Save the token as the admin token. On the host, run from the directory
+        /// with .env to default to localhost:ARENA_PORT and ARENA_ADMIN_TOKEN.
         #[arg(long)]
         admin: bool,
     },
