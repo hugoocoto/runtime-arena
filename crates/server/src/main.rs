@@ -29,6 +29,10 @@ async fn main() {
         config: JudgeConfig {
             isolate: config.isolate.clone(),
             runs_per_test: config.runs_per_test,
+            processes: config.processes,
+            max_failures: config.max_failures,
+            cg_root: config.cg_root.clone(),
+            box_storage: config.box_storage.clone(),
             ..JudgeConfig::default()
         },
     });

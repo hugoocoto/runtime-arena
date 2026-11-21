@@ -27,7 +27,7 @@ pub(crate) struct SubmissionRow {
     pub problem_version: i64,
     pub status: String,
     pub verdict: Option<String>,
-    pub time_ms: Option<i64>,
+    pub time_us: Option<i64>,
     pub memory_kib: Option<i64>,
     pub report: Option<String>,
     pub submitted_at: i64,
@@ -50,7 +50,7 @@ impl SubmissionRow {
             problem_version: self.problem_version,
             status,
             verdict: self.verdict.as_deref().and_then(parse_verdict),
-            time_ms: self.time_ms.map(|v| v as u64),
+            time_us: self.time_us.map(|v| v as u64),
             memory_kib: self.memory_kib.map(|v| v as u64),
             submitted_at: self.submitted_at,
             judged_at: self.judged_at,
@@ -76,7 +76,7 @@ fn parse_verdict(s: &str) -> Option<Verdict> {
 pub(crate) async fn find(state: &AppState, id: i64) -> ApiResult<(i64, SubmissionRow)> {
     let row = sqlx::query!(
         "SELECT s.id, s.user_id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version,
-                s.status, s.verdict, s.time_ms, s.memory_kib, s.report, s.submitted_at, s.judged_at
+                s.status, s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at
          FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id
          WHERE s.id = ?",
         id
@@ -94,7 +94,7 @@ pub(crate) async fn find(state: &AppState, id: i64) -> ApiResult<(i64, Submissio
             problem_version: row.problem_version,
             status: row.status,
             verdict: row.verdict,
-            time_ms: row.time_ms,
+            time_us: row.time_us,
             memory_kib: row.memory_kib,
             report: row.report,
             submitted_at: row.submitted_at,
@@ -111,7 +111,7 @@ async fn list(
     let rows = sqlx::query_as!(
         SubmissionRow,
         "SELECT s.id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version, s.status,
-                s.verdict, s.time_ms, s.memory_kib, s.report, s.submitted_at, s.judged_at
+                s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at
          FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id
          WHERE s.round_id = ? AND (? IS NULL OR s.user_id = ?)
          ORDER BY s.id",
@@ -360,7 +360,7 @@ pub async fn rejudge(
     Path(id): Path<i64>,
 ) -> ApiResult<Json<SubmissionInfo>> {
     let updated = sqlx::query!(
-        "UPDATE submissions SET status = 'queued', verdict = NULL, time_ms = NULL,
+        "UPDATE submissions SET status = 'queued', verdict = NULL, time_us = NULL,
             memory_kib = NULL, report = NULL, error = NULL, judged_at = NULL,
             problem_version = (SELECT version FROM problems WHERE id = submissions.problem_id),
             problem_dir = (SELECT dir FROM problems WHERE id = submissions.problem_id)

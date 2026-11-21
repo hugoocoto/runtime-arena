@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT s.id, s.user_id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version,\n                s.status, s.verdict, s.time_ms, s.memory_kib, s.report, s.submitted_at, s.judged_at\n         FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id\n         WHERE s.id = ?",
+  "query": "SELECT s.id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version, s.status,\n                s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at\n         FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id\n         WHERE s.round_id = ? AND (? IS NULL OR s.user_id = ?)\n         ORDER BY s.id",
   "describe": {
     "columns": [
       {
@@ -15,19 +15,8 @@
         }
       },
       {
-        "name": "user_id",
-        "ordinal": 1,
-        "type_info": "Integer",
-        "origin": {
-          "Table": {
-            "table": "submissions",
-            "name": "user_id"
-          }
-        }
-      },
-      {
         "name": "user",
-        "ordinal": 2,
+        "ordinal": 1,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -38,7 +27,7 @@
       },
       {
         "name": "round_id",
-        "ordinal": 3,
+        "ordinal": 2,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -49,7 +38,7 @@
       },
       {
         "name": "problem",
-        "ordinal": 4,
+        "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -60,7 +49,7 @@
       },
       {
         "name": "problem_version",
-        "ordinal": 5,
+        "ordinal": 4,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -71,7 +60,7 @@
       },
       {
         "name": "status",
-        "ordinal": 6,
+        "ordinal": 5,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +71,7 @@
       },
       {
         "name": "verdict",
-        "ordinal": 7,
+        "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -92,19 +81,19 @@
         }
       },
       {
-        "name": "time_ms",
-        "ordinal": 8,
+        "name": "time_us",
+        "ordinal": 7,
         "type_info": "Integer",
         "origin": {
           "Table": {
             "table": "submissions",
-            "name": "time_ms"
+            "name": "time_us"
           }
         }
       },
       {
         "name": "memory_kib",
-        "ordinal": 9,
+        "ordinal": 8,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -115,7 +104,7 @@
       },
       {
         "name": "report",
-        "ordinal": 10,
+        "ordinal": 9,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -126,7 +115,7 @@
       },
       {
         "name": "submitted_at",
-        "ordinal": 11,
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -137,7 +126,7 @@
       },
       {
         "name": "judged_at",
-        "ordinal": 12,
+        "ordinal": 11,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -148,10 +137,9 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 3
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -166,5 +154,5 @@
       true
     ]
   },
-  "hash": "68a9ee3975d9c99640bf535df8997fcd0370b631ffe130c2d20f5361e3bc3bd0"
+  "hash": "62e8ce5a071119ba5c4330059cb8dd4ea15349ab894782b1b853ba4c14f1e3cf"
 }

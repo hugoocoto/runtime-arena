@@ -88,7 +88,7 @@ async fn accepted_submission_reaches_both_boards() {
     let sub = submit(&s, &alice, "time=30 memory=900").await;
     let done = wait_judged(&s, &alice, sub.id).await;
     assert_eq!(done.verdict, Some(Verdict::Accepted));
-    assert_eq!((done.time_ms, done.memory_kib), (Some(30), Some(900)));
+    assert_eq!((done.time_us, done.memory_kib), (Some(30), Some(900)));
     assert_eq!(done.report.unwrap().tests.len(), 2);
 
     let b = &boards(&s, round, None).await[0];
@@ -120,7 +120,7 @@ async fn boards_rank_time_and_memory_separately() {
     let by_time: Vec<_> = b
         .by_time
         .iter()
-        .map(|e| (e.user.as_str(), e.time_ms))
+        .map(|e| (e.user.as_str(), e.time_us))
         .collect();
     assert_eq!(by_time, [("ann", 20), ("bob", 40)]);
     let by_memory: Vec<_> = b

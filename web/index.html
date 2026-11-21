@@ -73,7 +73,12 @@
 const state = { round: null, boards: {}, selected: null, pinned: false, previous: {}, offset: 0 };
 const $ = (id) => document.getElementById(id);
 
-function fmtTime(ms) { return ms >= 1000 ? (ms / 1000).toFixed(2) + " s" : ms + " ms"; }
+function trim(n) { return n.toFixed(3).replace(/\.?0+$/, ""); }
+function fmtTime(us) {
+  if (us >= 1000000) return trim(us / 1000000) + " s";
+  if (us >= 1000) return trim(us / 1000) + " ms";
+  return us + " µs";
+}
 function fmtMem(kib) {
   if (kib >= 10240) return (kib / 1024).toFixed(0) + " MiB";
   if (kib >= 1024) return (kib / 1024).toFixed(1) + " MiB";
@@ -128,7 +133,7 @@ function renderTable(target, entries) {
     if (e.rank === 1) tr.classList.add("first");
     if (prev[e.user] !== undefined && prev[e.user] !== e.rank) tr.classList.add("moved");
     ranks[e.user] = e.rank;
-    for (const [text, cls] of [[e.rank], [e.display_name, "name"], [fmtTime(e.time_ms)], [fmtMem(e.memory_kib)], [e.attempts]]) {
+    for (const [text, cls] of [[e.rank], [e.display_name, "name"], [fmtTime(e.time_us)], [fmtMem(e.memory_kib)], [e.attempts]]) {
       const td = document.createElement("td");
       td.textContent = text;
       if (cls) td.className = cls;

@@ -344,7 +344,7 @@ fn draw_table(f: &mut Frame, area: Rect, state: &State, board: Option<&Board>, b
         let row = Row::new(vec![
             Cell::from(format!("{:>3}", e.rank)),
             Cell::from(e.display_name.clone()),
-            Cell::from(format!("{:>9}", format::time(e.time_ms))),
+            Cell::from(format!("{:>9}", format::time(e.time_us))),
             Cell::from(format!("{:>9}", format::memory(e.memory_kib))),
             Cell::from(format!("{:>4}", e.attempts)),
         ]);
@@ -379,7 +379,7 @@ fn draw_scatter(f: &mut Frame, area: Rect, board: Option<&Board>) {
     let points: Vec<Vec<(f64, f64)>> = board
         .by_time
         .iter()
-        .map(|e| vec![(e.time_ms as f64, e.memory_kib as f64 / 1024.0)])
+        .map(|e| vec![(e.time_us as f64 / 1000.0, e.memory_kib as f64 / 1024.0)])
         .collect();
     let datasets = board
         .by_time
@@ -396,7 +396,10 @@ fn draw_scatter(f: &mut Frame, area: Rect, board: Option<&Board>) {
         })
         .collect();
     let (x_max, y_max) = board.by_time.iter().fold((1.0f64, 1.0f64), |(x, y), e| {
-        (x.max(e.time_ms as f64), y.max(e.memory_kib as f64 / 1024.0))
+        (
+            x.max(e.time_us as f64 / 1000.0),
+            y.max(e.memory_kib as f64 / 1024.0),
+        )
     });
     let (x_max, y_max) = (x_max * 1.1, y_max * 1.1);
     let chart = Chart::new(datasets)
@@ -428,7 +431,7 @@ pub fn rank_series(
     let mut best: HashMap<&str, (u64, u64, i64)> = HashMap::new();
     let mut series: BTreeMap<String, Vec<(f64, f64)>> = BTreeMap::new();
     for a in history {
-        let key = (a.time_ms, a.memory_kib, a.submission_id);
+        let key = (a.time_us, a.memory_kib, a.submission_id);
         let entry = best.entry(&a.user).or_insert(key);
         if key < *entry {
             *entry = key;
@@ -515,7 +518,7 @@ fn draw_mine(f: &mut Frame, area: Rect, state: &State) {
             .and_then(|r| r.first_failure())
             .map(|t| format!("test {}", t.name))
             .unwrap_or_default();
-        let (time, mem) = match (s.verdict, s.time_ms, s.memory_kib) {
+        let (time, mem) = match (s.verdict, s.time_us, s.memory_kib) {
             (Some(Verdict::Accepted), Some(t), Some(m)) => (format::time(t), format::memory(m)),
             _ => (String::new(), String::new()),
         };
@@ -561,12 +564,12 @@ mod tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
-    fn entry(rank: u32, user: &str, time_ms: u64, memory_kib: u64) -> BoardEntry {
+    fn entry(rank: u32, user: &str, time_us: u64, memory_kib: u64) -> BoardEntry {
         BoardEntry {
             rank,
             user: user.into(),
             display_name: user.to_uppercase(),
-            time_ms,
+            time_us,
             memory_kib,
             submission_id: rank as i64,
             submitted_at: 0,
@@ -605,8 +608,8 @@ mod tests {
                 round_id: 1,
                 problem: "sum".into(),
                 frozen: false,
-                by_time: vec![entry(1, "ann", 12, 1500), entry(2, "bob", 40, 900)],
-                by_memory: vec![entry(1, "bob", 40, 900), entry(2, "ann", 12, 1500)],
+                by_time: vec![entry(1, "ann", 12_000, 1500), entry(2, "bob", 40_000, 900)],
+                by_memory: vec![entry(1, "bob", 40_000, 900), entry(2, "ann", 12_000, 1500)],
             },
         });
         s
@@ -651,7 +654,7 @@ mod tests {
                 submission_id: 1,
                 user: "ann".into(),
                 display_name: "ANN".into(),
-                time_ms: 12,
+                time_us: 12_000,
                 memory_kib: 1500,
                 submitted_at: format::now() - 300,
             }],
@@ -665,11 +668,11 @@ mod tests {
 
     #[test]
     fn rank_over_time_replays_improvements() {
-        let a = |id, user: &str, time_ms, at| AcceptedSubmission {
+        let a = |id, user: &str, time_us, at| AcceptedSubmission {
             submission_id: id,
             user: user.into(),
             display_name: user.into(),
-            time_ms,
+            time_us,
             memory_kib: 1,
             submitted_at: at,
         };

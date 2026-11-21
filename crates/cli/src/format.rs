@@ -12,12 +12,20 @@ pub fn memory(kib: u64) -> String {
     }
 }
 
-pub fn time(ms: u64) -> String {
-    if ms >= 1000 {
-        format!("{:.2} s", ms as f64 / 1000.0)
+pub fn time(us: u64) -> String {
+    if us >= 1_000_000 {
+        format!("{} s", trim(us as f64 / 1_000_000.0))
+    } else if us >= 1000 {
+        format!("{} ms", trim(us as f64 / 1000.0))
     } else {
-        format!("{ms} ms")
+        format!("{us} µs")
     }
+}
+
+/// Three decimals at most, without trailing zeros: 1.5, 12.345, 103.
+fn trim(v: f64) -> String {
+    let s = format!("{v:.3}");
+    s.trim_end_matches('0').trim_end_matches('.').to_owned()
 }
 
 /// "1h 05m", "4m 09s", "12s".
@@ -66,8 +74,12 @@ mod tests {
         assert_eq!(memory(900), "900 KiB");
         assert_eq!(memory(1536), "1.5 MiB");
         assert_eq!(memory(262_144), "256 MiB");
-        assert_eq!(time(12), "12 ms");
-        assert_eq!(time(1593), "1.59 s");
+        assert_eq!(time(12), "12 µs");
+        assert_eq!(time(999), "999 µs");
+        assert_eq!(time(12_000), "12 ms");
+        assert_eq!(time(12_345), "12.345 ms");
+        assert_eq!(time(1_500_000), "1.5 s");
+        assert_eq!(time(1_593_000), "1.593 s");
         assert_eq!(duration(3900), "1h 05m");
         assert_eq!(duration(249), "4m 09s");
         assert_eq!(duration(-5), "0s");

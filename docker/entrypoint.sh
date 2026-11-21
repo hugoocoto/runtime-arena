@@ -25,6 +25,33 @@ echo "+cpuset +memory" > "$CG/isolate/cgroup.subtree_control"
 # JUDGE_CPUS: comma-separated CPU ids, one sandbox box per CPU (box i -> i-th CPU).
 # Empty means boxes are not pinned.
 JUDGE_CPUS="${JUDGE_CPUS:-}"
+workers=1
+if [ -n "$JUDGE_CPUS" ]; then
+    IFS=',' read -ra cpus <<< "$JUDGE_CPUS"
+    workers=${#cpus[@]}
+fi
+
+# A size-limited tmpfs per box. The judge replaces isolate's /box with this
+# directory, so a submission cannot fill the host disk. One mount per worker;
+# ARENA_BOX_COUNT can add spares (the judge test image uses 24 boxes).
+BOX_ROOT="${ARENA_BOX_STORAGE:-/var/local/lib/arena-boxes}"
+count="${ARENA_BOX_COUNT:-$workers}"
+if [ "$count" -lt "$workers" ]; then
+    count=$workers
+fi
+mkdir -p "$BOX_ROOT"
+i=0
+while [ "$i" -lt "$count" ]; do
+    dir="$BOX_ROOT/box-$i"
+    mkdir -p "$dir"
+    if ! mountpoint -q "$dir"; then
+        mount -t tmpfs \
+            -o "size=${ARENA_DISK_MB:-512}M,nr_inodes=65536,mode=1777,nosuid,nodev" \
+            tmpfs "$dir"
+    fi
+    i=$((i + 1))
+done
+
 {
     sed -e 's|^cg_root.*|cg_root = /sys/fs/cgroup/isolate|' \
         -e 's|^subid_user.*|first_uid = 60000\nfirst_gid = 60000\nnum_boxes = 1000|' \

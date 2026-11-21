@@ -23,7 +23,6 @@ use a `#!` script such as Python.
 
    ```sh
    curl -fsSL https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.sh | sh
-   export PATH="$HOME/.local/bin:$PATH"  # if `arena` is not found afterwards
    arena --version
    ```
 
@@ -35,14 +34,15 @@ use a `#!` script such as Python.
    ```
 
 2. Create an account. Use the server address and event code announced by the
-   organiser:
+   organiser. Replace `<port>` with the host's `ARENA_PORT` from `.env` (the
+   default is `8080`):
 
    ```sh
-   arena signup http://<host>:8080
+   arena signup http://<host>:<port>
    ```
 
-   Alternatively, create the account at `http://<host>:8080/join`, then run
-   `arena login http://<host>:8080`.
+   Alternatively, create the account at `http://<host>:<port>/join`, then run
+   `arena login http://<host>:<port>`.
 
 3. Inspect the round and submit a first Python solution:
 
@@ -54,7 +54,7 @@ use a `#!` script such as Python.
    import sys
 
    numbers = map(int, sys.stdin.buffer.read().split())
-   next(numbers)                         # n
+    next(numbers)
    print(sum(numbers))
    PY
    arena submit sum solution.py --src solution.py
@@ -80,13 +80,15 @@ scripts/host-preflight.sh
 docker compose up -d
 ```
 
-Open `http://<host>:8080/` on the projector, and announce `http://<host>:8080/join`
-and the event code (`ARENA_JOIN_CODE`): participants create their own accounts
-there or with `arena signup`. Then, with the `arena` CLI ([install it](#installing-the-cli)):
+`ARENA_PORT` controls the host port exposed by Compose. It defaults to `8080`.
+Open `http://<host>:<port>/` on the projector, and announce
+`http://<host>:<port>/join` and the event code (`ARENA_JOIN_CODE`): participants
+create their own accounts there or with `arena signup`. Then, with the `arena` CLI
+([install it](#installing-the-cli)):
 
 ```sh
 arena login --admin                           # from this directory: reads the token and server from .env
-# from another machine, set ARENA_SERVER=http://<host>:8080 and ARENA_ADMIN_TOKEN in its .env or environment
+# from another machine, set ARENA_SERVER=http://<host>:<port> and ARENA_ADMIN_TOKEN in its .env or environment
 arena admin problem add problems/sum          # a directory: problem.toml, statement.md, tests/
 arena admin round create --name "Round 1" --minutes 60 --freeze 10 sum
 arena admin round start 1
@@ -123,7 +125,7 @@ token by token. See `problems/sum` (run `problems/sum/gen.py` for its large test
 Before the event, run a mock contest (20 participants submitting at once):
 
 ```sh
-ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh
+ARENA_SERVER=http://localhost:<port> ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh
 ```
 
 ### Stable timings
@@ -135,6 +137,13 @@ ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scr
   `JUDGE_CPUS=0,2,4,6`. The same binary measured ~0.105 s on a P-core and
   ~0.163 s on an E-core there.
 - Each accepted test runs 3 times and the best time counts (`ARENA_RUNS_PER_TEST`).
+- Times come from the sandbox cgroup in microseconds, so threads and child
+  processes are counted in the total CPU time.
+- A submission may create up to 64 processes and threads (`ARENA_PROCESSES`), so
+  OpenMP, pthreads and multi-process programs work. Multi-node MPI is not
+  supported because the sandbox has no network.
+- Each box gets a size-limited tmpfs for its files (`ARENA_DISK_MB`, default
+  512 MiB), so a runaway program cannot fill the host disk.
 - Run `scripts/host-tuning.sh` to see settings that reduce noise (CPU governor,
   turbo, SMT, ...), and `sudo scripts/host-tuning.sh --apply` on a dedicated machine.
 
@@ -152,32 +161,34 @@ On Windows, in PowerShell:
 irm https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.ps1 | iex
 ```
 
-Both verify the download against the release's `SHA256SUMS` and usually need no
-admin rights. They install to `~/.local/bin` (`%LOCALAPPDATA%\Programs\arena` on
-Windows); set `PREFIX` to change it, or `VERSION` to pick a release.
+Both verify the download against the release's `SHA256SUMS`. The Linux/macOS
+installer installs to `/usr/local/bin` and uses `sudo` when needed; set `PREFIX`
+to change it, or `VERSION` to pick a release. Windows installs to
+`%LOCALAPPDATA%\Programs\arena`.
+
+The Linux/macOS installer also installs the `arena` man page and Bash, Zsh, and
+Fish completions under `/usr/local/share`. The release archive's `make install`
+path installs the same files.
 
 Or download an archive from the
 [releases](https://github.com/hugoocoto/runtime-arena/releases), unpack it, and run
 `sudo make install` to install to `/usr/local` (`sudo make uninstall` removes it).
-On Linux and macOS you also get the man pages (`man arena`) and bash, zsh and fish
-completions. On Windows, `arena completions powershell` prints its completions.
+On Windows, `arena completions powershell` prints its completions.
 
-## Participating
+## Participant command reference
 
-For the shortest path, follow [Participant quickstart](#participant-quickstart).
-The full command reference is below. Create your account with the event code
-the organiser announced (or on `http://<host>:8080/join`).
+For the shortest path, follow the [Participant quickstart](#participant-quickstart).
+This section covers the participant commands in more detail. If you have not
+joined yet, create an account with the event code at
+`http://<host>:<port>/join` or with `arena signup`.
 
 ```sh
-arena signup http://<host>:8080
 arena round                         # problems and time left
 arena problem sum --samples samples # statement; samples saved as samples/01.in ...
-arena build -- gcc -O2 -o sol sol.c # build in the judge's environment (Docker)
-arena submit sum ./sol --src sol.c  # source is required; shows each test's result
 arena board                         # live boards, time × memory chart, ranks over time
 ```
 
-Log in on another machine with `arena login <host>:8080`, and end the session on
+Log in on another machine with `arena login <host>:<port>`, and end the session on
 this one with `arena logout`. Your password is only sent when logging in: the CLI
 keeps a per-device token instead. In scripts, use `--username` and
 `--password-stdin`, and `--json` on read commands. Exit codes are listed in
@@ -186,7 +197,19 @@ keeps a per-device token instead. In scripts, use `--username` and
 Submissions must run on the judge: a Linux x86-64 executable linked against the
 judge's libraries, or a `#!` script for an interpreter installed there
 (`python3`). `arena build` runs your command in the published build image, which
-shares its base with the judge; on Apple Silicon it runs under emulation.
+shares its base with the judge; on Apple Silicon it runs under emulation. For
+compiled solutions, the command after `--` is run inside that image:
+
+```sh
+arena build -- gcc -O2 -o sol solution.c
+arena build -- g++ -O2 -std=c++20 -o sol solution.cpp
+arena build -- cargo build --release --bin solution
+arena build -- zig build-exe solution.zig -O ReleaseFast -femit-bin=sol
+```
+
+The Cargo command writes its binary to `target/release/solution`; the other
+examples write `sol`. Submit the resulting executable with `arena submit`,
+including the source with `--src`.
 
 ## Development
 

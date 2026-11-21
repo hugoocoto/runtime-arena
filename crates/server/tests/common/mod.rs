@@ -45,6 +45,10 @@ impl TestServer {
             judge_boxes: vec![0],
             isolate: "isolate".into(),
             runs_per_test: 1,
+            processes: 64,
+            max_failures: 3,
+            cg_root: "/sys/fs/cgroup/isolate".into(),
+            box_storage: None,
             update_check: false,
             rate_limit: 0,
         };
@@ -200,15 +204,15 @@ impl JudgeBackend for FakeJudge {
                 Some(v) => serde_json::from_value(Value::String(v.into())).unwrap(),
                 None => arena_protocol::Verdict::Accepted,
             };
-            let time_ms = field("time").map_or(10, |t| t.parse().unwrap());
+            let time_us = field("time").map_or(10, |t| t.parse().unwrap());
             let memory_kib = field("memory").map_or(1000, |m| m.parse().unwrap());
             let mut tests = Vec::new();
             for (i, t) in problem.tests.iter().enumerate() {
                 let r = arena_protocol::TestResult {
                     name: t.name.clone(),
                     verdict,
-                    time_ms,
-                    wall_time_ms: time_ms,
+                    time_us,
+                    wall_time_us: time_us,
                     memory_kib,
                     message: None,
                 };

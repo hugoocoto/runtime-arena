@@ -53,6 +53,14 @@ pub struct JudgeConfig {
     pub runs_per_test: u32,
     /// Largest output a program may write, in KiB.
     pub output_limit_kib: u64,
+    /// Processes and threads one submission may create.
+    pub processes: u32,
+    /// Stop after this many failing tests; 0 runs every test.
+    pub max_failures: u32,
+    /// Isolate's cgroup root, for microsecond CPU accounting.
+    pub cg_root: PathBuf,
+    /// Root of the per-box tmpfs mounts prepared by the entrypoint, if any.
+    pub box_storage: Option<PathBuf>,
 }
 
 impl Default for JudgeConfig {
@@ -61,6 +69,10 @@ impl Default for JudgeConfig {
             isolate: "isolate".into(),
             runs_per_test: 3,
             output_limit_kib: 64 * 1024,
+            processes: 64,
+            max_failures: 3,
+            cg_root: "/sys/fs/cgroup/isolate".into(),
+            box_storage: Some("/var/local/lib/arena-boxes".into()),
         }
     }
 }
@@ -74,12 +86,17 @@ pub struct Judge {
 impl Judge {
     pub fn new(config: JudgeConfig, box_id: u32) -> Self {
         Judge {
-            sandbox: Sandbox::new(&config.isolate, box_id),
+            sandbox: Sandbox::new(
+                &config.isolate,
+                box_id,
+                &config.cg_root,
+                config.box_storage.clone(),
+            ),
             config,
         }
     }
 
-    /// Runs `executable` on every test of `problem`.
+    /// Runs `executable` on the problem's tests.
     ///
     /// Errors mean the judge could not do its job (sandbox failure, unreadable
     /// files); problems with the submission are verdicts in the report.
@@ -100,8 +117,10 @@ impl Judge {
             time: problem.time_limit,
             memory_kib: problem.memory_limit_kib,
             output_kib: self.config.output_limit_kib,
+            processes: self.config.processes,
         };
         let mut results = Vec::with_capacity(problem.tests.len());
+        let mut failures = 0;
         for test in &problem.tests {
             let result = self
                 .judge_test(problem, test, executable, &limits, scratch.path())
@@ -111,7 +130,19 @@ impl Judge {
             let result = result?;
             tracing::debug!(test = %result.name, verdict = ?result.verdict, "test judged");
             on_test(results.len(), &result);
+            let accepted = result.verdict.is_accepted();
             results.push(result);
+            if !accepted {
+                failures += 1;
+                if self.config.max_failures > 0 && failures >= self.config.max_failures {
+                    tracing::debug!(
+                        failures,
+                        remaining = problem.tests.len() - results.len(),
+                        "stopping after enough failures"
+                    );
+                    break;
+                }
+            }
         }
         Ok(JudgeReport::from_tests(results))
     }
@@ -127,8 +158,8 @@ impl Judge {
         let mut result = TestResult {
             name: test.name.clone(),
             verdict: Verdict::Accepted,
-            time_ms: u64::MAX,
-            wall_time_ms: u64::MAX,
+            time_us: u64::MAX,
+            wall_time_us: u64::MAX,
             memory_kib: u64::MAX,
             message: None,
         };
@@ -142,9 +173,9 @@ impl Judge {
                 .run("sol", "in", "out", &meta_file, limits)
                 .await?;
 
-            result.time_ms = result.time_ms.min(meta.time.as_millis() as u64);
-            result.wall_time_ms = result.wall_time_ms.min(meta.wall_time.as_millis() as u64);
-            result.memory_kib = result.memory_kib.min(meta.max_rss_kib);
+            result.time_us = result.time_us.min(meta.time.as_micros() as u64);
+            result.wall_time_us = result.wall_time_us.min(meta.wall_time.as_micros() as u64);
+            result.memory_kib = result.memory_kib.min(memory_kib(&meta));
 
             let failure = match classify(&meta, limits.time) {
                 Some(failure) => Some(failure),
@@ -155,9 +186,9 @@ impl Judge {
             };
             if let Some((verdict, message)) = failure {
                 // Report the failing run's own numbers, not the best of earlier runs.
-                result.time_ms = meta.time.as_millis() as u64;
-                result.wall_time_ms = meta.wall_time.as_millis() as u64;
-                result.memory_kib = meta.max_rss_kib;
+                result.time_us = meta.time.as_micros() as u64;
+                result.wall_time_us = meta.wall_time.as_micros() as u64;
+                result.memory_kib = memory_kib(&meta);
                 result.verdict = verdict;
                 result.message = Some(message);
                 break;
@@ -229,7 +260,7 @@ fn classify(meta: &RunMeta, time_limit: Duration) -> Option<(Verdict, String)> {
     if status == Some("TO") || meta.time > time_limit {
         return Some((
             Verdict::TimeLimitExceeded,
-            format!("ran {} ms", meta.time.as_millis()),
+            format!("ran {:.3} ms", meta.time.as_secs_f64() * 1000.0),
         ));
     }
     match (status, meta.exit_signal, meta.exit_code) {
@@ -245,6 +276,17 @@ fn classify(meta: &RunMeta, time_limit: Duration) -> Option<(Verdict, String)> {
                 .unwrap_or_else(|| format!("isolate status {other}")),
         )),
         (None, _, _) => None,
+    }
+}
+
+/// Peak memory of the whole sandbox when the kernel reports it, so processes
+/// started by a parallel submission are counted. Falls back to the main
+/// process's peak RSS on older kernels.
+fn memory_kib(meta: &RunMeta) -> u64 {
+    if meta.cg_mem_kib > 0 {
+        meta.cg_mem_kib
+    } else {
+        meta.max_rss_kib
     }
 }
 

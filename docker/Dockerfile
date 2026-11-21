@@ -17,12 +17,19 @@
 FROM debian:trixie-slim AS base
 # Interpreters available to shebang submissions (#!/usr/bin/env python3, ...).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 ca-certificates \
+ && apt-get install -y --no-install-recommends python3 ca-certificates libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS build-env
 RUN apt-get update \
- && apt-get install -y --no-install-recommends gcc g++ libc6-dev make git \
+ && apt-get install -y --no-install-recommends gcc g++ libc6-dev make git cargo rustc curl xz-utils \
+ && curl -fsSL -o /tmp/zig.tar.xz \
+      https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz \
+ && echo '24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c  /tmp/zig.tar.xz' \
+      | sha256sum -c - \
+ && tar -xJf /tmp/zig.tar.xz -C /opt \
+ && ln -s /opt/zig-x86_64-linux-0.14.1/zig /usr/local/bin/zig \
+ && rm -f /tmp/zig.tar.xz \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /work
 CMD ["bash"]
@@ -66,14 +73,15 @@ RUN cargo build --release --locked -p arena-server \
 
 FROM base AS server
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libcap2 libseccomp2 \
+ && apt-get install -y --no-install-recommends libcap2 libseccomp2 util-linux \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=isolate /src/isolate /usr/local/bin/isolate
 COPY --from=isolate /src/default.cf /usr/local/etc/isolate.default
 COPY --from=rust /arena-server /usr/local/bin/arena-server
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 ENV ARENA_LISTEN=0.0.0.0:8080 \
-    ARENA_DATA=/data
+    ARENA_DATA=/data \
+    ARENA_BOX_STORAGE=/var/local/lib/arena-boxes
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s CMD python3 -c "import urllib.request,sys; sys.exit(urllib.request.urlopen('http://127.0.0.1:8080/healthz').status != 200)"
@@ -84,7 +92,7 @@ CMD ["arena-server"]
 # with a private cgroup namespace (scripts/judge-tests.sh). Not published.
 FROM chef AS judge-test
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libcap2 libseccomp2 python3 \
+ && apt-get install -y --no-install-recommends libcap2 libseccomp2 python3 util-linux \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=isolate /src/isolate /usr/local/bin/isolate
 COPY --from=isolate /src/default.cf /usr/local/etc/isolate.default
@@ -94,6 +102,8 @@ COPY --from=planner /src/recipe.json recipe.json
 RUN cargo chef cook --tests --locked -p arena-judge --recipe-path recipe.json
 COPY . .
 RUN cargo test --no-run --locked -p arena-judge
-ENV ARENA_ISOLATE_TESTS=1
+ENV ARENA_ISOLATE_TESTS=1 \
+    ARENA_BOX_STORAGE=/var/local/lib/arena-boxes \
+    ARENA_BOX_COUNT=24
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["cargo", "test", "--locked", "-p", "arena-judge"]

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE submissions SET status = 'done', verdict = ?, time_us = ?, memory_kib = ?,\n                    report = ?, error = NULL, judged_at = ?\n                 WHERE id = ? AND status = 'judging' AND problem_version = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "228c52d0ba5199189ebe7259a4b3fe2a8472ae2c87f4da4bc3b9fd3694e065b2"
+}

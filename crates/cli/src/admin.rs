@@ -180,7 +180,7 @@ pub async fn submissions(c: &Client, round: Option<i64>, json: bool) -> Result<(
     }
     for s in list {
         let verdict = s.verdict.map(format::verdict).unwrap_or("pending");
-        let numbers = match (s.time_ms, s.memory_kib) {
+        let numbers = match (s.time_us, s.memory_kib) {
             (Some(t), Some(m)) => format!("{} {}", format::time(t), format::memory(m)),
             _ => String::new(),
         };

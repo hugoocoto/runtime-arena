@@ -35,8 +35,13 @@ fn program(name: &str, dir: &Path) -> PathBuf {
         return src.join(name);
     }
     let out = dir.join(name);
-    let status = Command::new("cc")
-        .args(["-O2", "-o"])
+    let mut command = Command::new("cc");
+    command.args(["-O2", "-pthread"]);
+    if name == "openmp" {
+        command.arg("-fopenmp");
+    }
+    let status = command
+        .args(["-o"])
         .arg(&out)
         .arg(src.join(format!("{name}.c")))
         .status()
@@ -94,6 +99,37 @@ async fn shebang_script_accepted() {
 }
 
 #[tokio::test]
+async fn parallel_program_is_allowed() {
+    if !enabled() {
+        return;
+    }
+    let r = judge(19, "sum", "threads", once()).await;
+    assert_eq!(verdicts(&r), [Verdict::Accepted, Verdict::Accepted]);
+}
+
+#[tokio::test]
+async fn openmp_program_is_allowed() {
+    if !enabled() {
+        return;
+    }
+    let r = judge(21, "sum", "openmp", once()).await;
+    assert_eq!(verdicts(&r), [Verdict::Accepted, Verdict::Accepted]);
+}
+
+#[tokio::test]
+async fn stops_after_max_failures() {
+    if !enabled() {
+        return;
+    }
+    let config = JudgeConfig {
+        max_failures: 1,
+        ..once()
+    };
+    let r = judge(20, "sum", "re", config).await;
+    assert_eq!(verdicts(&r), [Verdict::RuntimeError]);
+}
+
+#[tokio::test]
 async fn wrong_answer_names_the_failing_test() {
     if !enabled() {
         return;
@@ -127,7 +163,7 @@ async fn time_limit() {
     let r = judge(14, "sum", "tle", once()).await;
     assert_eq!(verdicts(&r), [Verdict::TimeLimitExceeded; 2]);
     // Killed only after the extra time (limit + 0.5 s), so the time is past the limit.
-    assert!(r.time_ms >= 1400, "{}", r.time_ms);
+    assert!(r.time_us >= 1_400_000, "{}", r.time_us);
 }
 
 #[tokio::test]

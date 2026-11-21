@@ -22,6 +22,15 @@ pub struct Config {
     pub isolate: PathBuf,
     /// Times each accepted test runs; the best time and memory count.
     pub runs_per_test: u32,
+    /// Processes and threads one submission may create (`ARENA_PROCESSES`).
+    pub processes: u32,
+    /// Stop judging a submission after this many failing tests; 0 runs all
+    /// (`ARENA_MAX_FAILURES`).
+    pub max_failures: u32,
+    /// Isolate's cgroup root, read for microsecond CPU time (`ARENA_CG_ROOT`).
+    pub cg_root: PathBuf,
+    /// Root of the size-limited per-box directories (`ARENA_BOX_STORAGE`).
+    pub box_storage: Option<PathBuf>,
     /// Periodically ask GitHub for the latest release (`ARENA_UPDATE_CHECK=off` disables).
     pub update_check: bool,
     /// Requests per second allowed from one address (`ARENA_RATE_LIMIT`; 0 disables).
@@ -61,6 +70,28 @@ impl Config {
                 .ok_or("ARENA_RUNS_PER_TEST must be a positive integer")?,
             None => 3,
         };
+        let processes = match var("ARENA_PROCESSES") {
+            Some(v) => v
+                .parse()
+                .ok()
+                .filter(|n| (1..=4096).contains(n))
+                .ok_or("ARENA_PROCESSES must be between 1 and 4096")?,
+            None => 64,
+        };
+        let max_failures = match var("ARENA_MAX_FAILURES") {
+            Some(v) => v
+                .parse()
+                .map_err(|_| "ARENA_MAX_FAILURES must be a whole number (0 runs every test)")?,
+            None => 3,
+        };
+        let cg_root = var("ARENA_CG_ROOT")
+            .unwrap_or_else(|| "/sys/fs/cgroup/isolate".into())
+            .into();
+        let box_storage = Some(
+            var("ARENA_BOX_STORAGE")
+                .unwrap_or_else(|| "/var/local/lib/arena-boxes".into())
+                .into(),
+        );
         let update_check = match var("ARENA_UPDATE_CHECK").as_deref() {
             None | Some("on" | "true" | "1") => true,
             Some("off" | "false" | "0") => false,
@@ -82,6 +113,10 @@ impl Config {
                 .unwrap_or_else(|| "isolate".into())
                 .into(),
             runs_per_test,
+            processes,
+            max_failures,
+            cg_root,
+            box_storage,
             update_check,
             rate_limit,
         })

@@ -163,7 +163,7 @@ pub async fn upload(
     tracing::info!(%slug, version, tests = test_count, "problem uploaded");
     if q.rejudge {
         let requeued = sqlx::query!(
-            "UPDATE submissions SET status = 'queued', verdict = NULL, time_ms = NULL,
+            "UPDATE submissions SET status = 'queued', verdict = NULL, time_us = NULL,
                 memory_kib = NULL, report = NULL, error = NULL, judged_at = NULL,
                 problem_version = ?, problem_dir = ?
              WHERE problem_id = (SELECT id FROM problems WHERE slug = ?)",

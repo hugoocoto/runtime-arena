@@ -134,16 +134,16 @@ async fn record(
     let updated = match outcome {
         Ok(report) => {
             let verdict = verdict_str(report.verdict);
-            let time_ms = report.time_ms as i64;
+            let time_us = report.time_us as i64;
             let memory_kib = report.memory_kib as i64;
             let json = serde_json::to_string(report).unwrap_or_default();
-            tracing::info!(submission = job.id, verdict = %verdict, time_ms, memory_kib, "judged");
+            tracing::info!(submission = job.id, verdict = %verdict, time_us, memory_kib, "judged");
             sqlx::query!(
-                "UPDATE submissions SET status = 'done', verdict = ?, time_ms = ?, memory_kib = ?,
+                "UPDATE submissions SET status = 'done', verdict = ?, time_us = ?, memory_kib = ?,
                     report = ?, error = NULL, judged_at = ?
                  WHERE id = ? AND status = 'judging' AND problem_version = ?",
                 verdict,
-                time_ms,
+                time_us,
                 memory_kib,
                 json,
                 t,
