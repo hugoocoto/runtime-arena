@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/hugoocoto/runtime-arena/compare/v0.3.0...v0.4.0) (2026-11-21)
+
+
+### Features
+
+* **cli:** default admin login to localhost and .env on the host ([#9](https://github.com/hugoocoto/runtime-arena/issues/9)) ([c390095](https://github.com/hugoocoto/runtime-arena/commit/c3900954610d531e18f3a741f1459824904e8e2f))
+
 ## [0.3.0](https://github.com/hugoocoto/runtime-arena/compare/v0.2.0...v0.3.0) (2026-11-21)
 
 
