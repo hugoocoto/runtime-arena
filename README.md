@@ -28,23 +28,28 @@ docker compose up -d
 
 Open `http://<host>:8080/` on the projector, and announce `http://<host>:8080/join`
 and the event code (`ARENA_JOIN_CODE`): participants create their own accounts
-there. Then, with the `arena` CLI (download the executable for your platform
-from the [releases](https://github.com/hugoocoto/runtime-arena/releases)):
+there or with `arena signup`. Then, with the `arena` CLI ([install it](#installing-the-cli)):
 
 ```sh
 arena login --admin                           # from this directory: reads the token and server from .env
 # from another machine, set ARENA_SERVER=http://<host>:8080 and ARENA_ADMIN_TOKEN in its .env or environment
 arena admin problem add problems/sum          # a directory: problem.toml, statement.md, tests/
-arena admin user add alice --display-name "Alice"   # optional: an account made by you; prints its token once
 arena admin round create --name "Round 1" --minutes 60 --freeze 10 sum
 arena admin round start 1
 arena admin submissions                       # review; `arena admin source <id>` downloads code
+arena admin user reset-password alice         # forgotten password: prints a new one, logs out their devices
 ```
 
 The server checks GitHub for a newer release at startup and every 6 hours. It
 only notifies you, in its logs, after `arena login --admin`, and with
 `arena admin update`; to update, run `docker compose pull && docker compose up -d`.
 Set `ARENA_UPDATE_CHECK=off` in `.env` to disable the check.
+
+Each network address is limited to 10 failed logins per account and 100 failed
+logins or wrong event codes per 15 minutes, 300 new accounts per 15 minutes, 200
+requests per second (`ARENA_RATE_LIMIT` in `.env`, 0 disables it) and 512 open
+connections. Behind a reverse proxy the server sees every client as the proxy's
+address, so these limits are shared.
 
 In a terminal, any argument you leave out is asked for, so `arena admin round create`
 alone walks you through it. In scripts a missing argument is an error.
@@ -64,7 +69,7 @@ token by token. See `problems/sum` (run `problems/sum/gen.py` for its large test
 Before the event, run a mock contest (20 participants submitting at once):
 
 ```sh
-ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... scripts/mock-contest.sh
+ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh
 ```
 
 ### Stable timings
@@ -79,17 +84,37 @@ ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... scripts/mock-contest.sh
 - Run `scripts/host-tuning.sh` to see settings that reduce noise (CPU governor,
   turbo, SMT, ...), and `sudo scripts/host-tuning.sh --apply` on a dedicated machine.
 
-## Participating
+## Installing the CLI
 
-Download `arena` for your platform from the
-[releases](https://github.com/hugoocoto/runtime-arena/releases).
-
-1. Open `http://<host>:8080/join`, pick a username and password, and enter the
-   event code the organiser announced.
-2. Log in from your terminal (it asks for the username and password):
+On Linux and macOS:
 
 ```sh
-arena login <host>:8080
+curl -fsSL https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.ps1 | iex
+```
+
+Both verify the download against the release's `SHA256SUMS` and need no admin
+rights. They install to `~/.local` (`%LOCALAPPDATA%\Programs\arena` on Windows);
+set `PREFIX` to change it, or `VERSION` to pick a release.
+
+Or download an archive from the
+[releases](https://github.com/hugoocoto/runtime-arena/releases), unpack it, and run
+`sudo make install` to install to `/usr/local` (`sudo make uninstall` removes it).
+On Linux and macOS you also get the man pages (`man arena`) and bash, zsh and fish
+completions. On Windows, `arena completions powershell` prints its completions.
+
+## Participating
+
+Create your account with the event code the organiser announced (or on
+`http://<host>:8080/join`). It logs you in:
+
+```sh
+arena signup <host>:8080
 arena round                         # problems and time left
 arena problem sum --samples samples # statement; samples saved as samples/01.in ...
 arena build -- gcc -O2 -o sol sol.c # build in the judge's environment (Docker)
@@ -97,9 +122,11 @@ arena submit sum ./sol --src sol.c  # source is required; shows each test's resu
 arena board                         # live boards, time × memory chart, ranks over time
 ```
 
-Logging in again later, or on another machine, is just `arena login` (the
-server is remembered). If the organiser created your account, they give you a
-token instead: `arena login <host>:8080 <token>`.
+Log in on another machine with `arena login <host>:8080`, and end the session on
+this one with `arena logout`. Your password is only sent when logging in: the CLI
+keeps a per-device token instead. In scripts, use `--username` and
+`--password-stdin`, and `--json` on read commands. Exit codes are listed in
+`man arena`.
 
 Submissions must run on the judge: a Linux x86-64 executable linked against the
 judge's libraries, or a `#!` script for an interpreter installed there

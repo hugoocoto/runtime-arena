@@ -3,7 +3,7 @@
 # uploads problems/sum, creates participants, starts a round, and has every
 # participant submit several solutions at the same time.
 #
-#   ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... scripts/mock-contest.sh [users] [rounds-of-submissions]
+#   ARENA_SERVER=http://localhost:8080 ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/mock-contest.sh [users] [rounds-of-submissions]
 #
 # Needs Docker (to build the solutions in the build-env image) and cargo.
 set -euo pipefail
@@ -13,7 +13,8 @@ users=${1:-20}
 repeat=${2:-3}
 : "${ARENA_SERVER:=http://localhost:8080}"
 : "${ARENA_ADMIN_TOKEN:?set ARENA_ADMIN_TOKEN}"
-export ARENA_SERVER ARENA_ADMIN_TOKEN
+: "${ARENA_JOIN_CODE:?set ARENA_JOIN_CODE}"
+export ARENA_SERVER ARENA_ADMIN_TOKEN ARENA_JOIN_CODE
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 # Keep the user's own CLI config untouched.
@@ -39,7 +40,11 @@ echo "== $users participants"
 run=$(date +%s)
 tokens=()
 for i in $(seq 1 "$users"); do
-    tokens+=("$("$arena" admin user add "mock$run-$i" --display-name "Mock $i" | sed -n '2s/^ *//p')")
+    # Each participant gets its own config, and the token is read back from it.
+    config="$work/user-$i.toml"
+    printf 'mock-password\n' | ARENA_CONFIG="$config" ARENA_TOKEN='' "$arena" signup "$ARENA_SERVER" \
+        --username "mock$run-$i" --display-name "Mock $i" --password-stdin >/dev/null
+    tokens+=("$(sed -n 's/^token = "\(.*\)"$/\1/p' "$config")")
 done
 
 echo "== round"

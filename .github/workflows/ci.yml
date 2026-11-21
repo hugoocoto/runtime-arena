@@ -71,8 +71,14 @@ jobs:
           target: server
           tags: ghcr.io/${{ github.repository }}-server:latest
           load: true
-          cache-from: type=gha,scope=server
-          cache-to: type=gha,mode=max,scope=server
+          # The smoke test doesn't run the server binary, so skip optimising it.
+          # Its own cache scope keeps these layers apart from the release build.
+          build-args: |
+            CARGO_PROFILE_RELEASE_LTO=off
+            CARGO_PROFILE_RELEASE_OPT_LEVEL=0
+            CARGO_PROFILE_RELEASE_CODEGEN_UNITS=256
+          cache-from: type=gha,scope=server-ci
+          cache-to: type=gha,mode=max,scope=server-ci
       - run: ./scripts/sandbox-smoke.sh
         env:
           SKIP_BUILD: "1"

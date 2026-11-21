@@ -1,6 +1,6 @@
-use arena_protocol::{CreateUser, UserInfo, UserToken};
+use arena_protocol::{UserInfo, UserToken};
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 
 use crate::auth::{Admin, Participant, hash_token, new_token};
 use crate::error::{ApiError, ApiResult};
@@ -25,16 +25,8 @@ pub async fn list(_: Admin, State(state): State<AppState>) -> ApiResult<Json<Vec
     Ok(Json(users))
 }
 
-/// `POST /api/admin/users`: creates a participant and returns their token once.
-pub async fn create(
-    _: Admin,
-    State(state): State<AppState>,
-    Json(req): Json<CreateUser>,
-) -> ApiResult<Json<UserToken>> {
-    Ok(Json(insert(&state, req.name, req.display_name).await?))
-}
-
-/// Creates a participant with a new token (admin creation and `/join`).
+/// Creates a participant for sign-up. The account token is never handed out:
+/// devices authenticate with the session tokens from `/api/login`.
 pub(crate) async fn insert(
     state: &AppState,
     name: String,
@@ -68,28 +60,4 @@ pub(crate) async fn insert(
         )));
     }
     Ok(UserToken { name, token })
-}
-
-/// `POST /api/admin/users/{name}/token`: replaces a lost token; the old one stops working.
-pub async fn reset_token(
-    _: Admin,
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> ApiResult<Json<UserToken>> {
-    let token = new_token();
-    let hash = hash_token(&token);
-    let updated = sqlx::query!("UPDATE users SET token_hash = ? WHERE name = ?", hash, name)
-        .execute(&state.db)
-        .await?;
-    if updated.rows_affected() == 0 {
-        return Err(ApiError::not_found(format!("no user {name}")));
-    }
-    // A reset also logs out every device the participant logged in from.
-    sqlx::query!(
-        "DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE name = ?)",
-        name
-    )
-    .execute(&state.db)
-    .await?;
-    Ok(Json(UserToken { name, token }))
 }

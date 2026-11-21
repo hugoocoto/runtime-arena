@@ -9,6 +9,8 @@ use std::str::FromStr;
 
 use anyhow::{Result, bail};
 
+use crate::errors::UsageError;
+
 pub fn is_interactive() -> bool {
     std::io::stdin().is_terminal()
 }
@@ -23,7 +25,7 @@ where
         return Ok(value);
     }
     if !is_interactive() {
-        bail!("missing {arg}");
+        return Err(UsageError(format!("missing {arg}")).into());
     }
     let answer = answer(
         &mut std::io::stdin().lock(),
@@ -31,7 +33,7 @@ where
         label,
         None,
     )?;
-    answer.ok_or_else(|| anyhow::anyhow!("missing {arg}"))
+    answer.ok_or_else(|| UsageError(format!("missing {arg}")).into())
 }
 
 /// The given value; else, when `prompt` is set, an answer with a default.

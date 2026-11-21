@@ -44,7 +44,7 @@ pub async fn clock(state: AppState) {
     }
 }
 
-/// Uses the bundled root certificates: the server image has no CA store.
+/// Uses the bundled root certificates, so the check doesn't depend on a CA store.
 fn client() -> Result<reqwest::Client, reqwest::Error> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let roots = webpki_root_certs::TLS_SERVER_ROOT_CERTS

@@ -1,23 +1,27 @@
-//! `arena admin ...`: users, problems, rounds and submission review.
+//! `arena admin ...`: participants, problems, rounds and submission review.
 
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use arena_protocol::{
-    CreateRound, CreateUser, ExtendRound, ProblemSummary, RoundInfo, SubmissionInfo, UpdateInfo,
-    UserInfo, UserToken,
+    CreateRound, ExtendRound, PasswordReset, ProblemSummary, RoundInfo, SubmissionInfo, UpdateInfo,
+    UserInfo,
 };
 use serde_json::json;
 
 use crate::client::Client;
 use crate::config::Config;
+use crate::errors::{NotLoggedIn, UsageError, status_of};
 use crate::format;
 use crate::participant::{pack, print_result, print_round};
 
 pub fn admin(config: &Config) -> Result<Client> {
-    let token = config.admin_token.clone().context(
-        "no admin token; run `arena login --admin` or set ARENA_SERVER and ARENA_ADMIN_TOKEN",
-    )?;
+    let token = config.admin_token.clone().ok_or_else(|| {
+        NotLoggedIn(
+            "no admin token; run `arena login --admin` or set ARENA_SERVER and ARENA_ADMIN_TOKEN"
+                .into(),
+        )
+    })?;
     Client::new(config.server()?, Some(token))
 }
 
@@ -26,10 +30,12 @@ const UPGRADE_HINT: &str = "Update the host with: docker compose pull && docker 
 
 /// `arena admin update`: whether a newer server release exists.
 pub async fn update(c: &Client) -> Result<()> {
-    let info: UpdateInfo = c
-        .get("/api/admin/update")
-        .await
-        .context("this server is too old to report updates")?;
+    let info: UpdateInfo = match c.get("/api/admin/update").await {
+        Err(e) if status_of(&e) == Some(reqwest::StatusCode::NOT_FOUND) => {
+            return Err(e.context("this server is too old to report updates"));
+        }
+        other => other?,
+    };
     println!("Server version: {}", info.current);
     match &info.latest {
         Some(latest) => println!("Latest release: {latest}"),
@@ -61,39 +67,41 @@ fn print_update(info: &UpdateInfo) {
     println!("{UPGRADE_HINT}");
 }
 
-pub async fn user_add(c: &Client, name: &str, display_name: Option<String>) -> Result<()> {
-    let t: UserToken = c
-        .post(
-            "/api/admin/users",
-            &CreateUser {
-                name: name.to_owned(),
-                display_name,
-            },
-        )
-        .await?;
-    print_token(c, &t);
-    Ok(())
-}
-
-pub async fn user_reset(c: &Client, name: &str) -> Result<()> {
-    let t: UserToken = c
-        .post(&format!("/api/admin/users/{name}/token"), &json!({}))
-        .await?;
-    print_token(c, &t);
-    Ok(())
-}
-
-fn print_token(c: &Client, t: &UserToken) {
-    println!("Token for {} (shown only once):", t.name);
-    println!("  {}", t.token);
-    println!("They log in with:\n  arena login {} {}", c.base(), t.token);
-}
-
-pub async fn user_list(c: &Client) -> Result<()> {
+pub async fn user_list(c: &Client, json: bool) -> Result<()> {
     let users: Vec<UserInfo> = c.get("/api/admin/users").await?;
+    if json {
+        return format::print_json(&users);
+    }
     for u in users {
         println!("{:<20} {}", u.name, u.display_name);
     }
+    Ok(())
+}
+
+/// Checked here because the name becomes part of the URL: `a?b` would reset `a`.
+fn checked_user_name(name: &str) -> Result<String> {
+    let name = name.trim().to_ascii_lowercase();
+    let valid = (1..=40).contains(&name.len())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    if !valid {
+        return Err(
+            UsageError("a username is 1-40 lowercase letters, digits or '-'".into()).into(),
+        );
+    }
+    Ok(name)
+}
+
+pub async fn reset_password(c: &Client, name: &str) -> Result<()> {
+    let name = checked_user_name(name)?;
+    let r: PasswordReset = c
+        .post(&format!("/api/admin/users/{name}/password"), &json!({}))
+        .await?;
+    println!("New password for {} (shown only once):", r.name);
+    println!("  {}", r.password);
+    println!("All their devices were logged out. They log in with:");
+    println!("  arena login {}", c.base());
     Ok(())
 }
 
@@ -119,8 +127,11 @@ pub async fn problem_add(c: &Client, dir: &Path, slug: Option<&str>, rejudge: bo
     Ok(())
 }
 
-pub async fn problem_list(c: &Client) -> Result<()> {
+pub async fn problem_list(c: &Client, json: bool) -> Result<()> {
     let problems: Vec<ProblemSummary> = c.get("/api/admin/problems").await?;
+    if json {
+        return format::print_json(&problems);
+    }
     for p in problems {
         println!(
             "{:<20} v{:<3} {:>3} tests  {:>5} ms {:>5} MiB  {}",
@@ -137,8 +148,11 @@ pub async fn round_create(c: &Client, req: CreateRound) -> Result<()> {
     Ok(())
 }
 
-pub async fn round_list(c: &Client) -> Result<()> {
+pub async fn round_list(c: &Client, json: bool) -> Result<()> {
     let rounds: Vec<RoundInfo> = c.get("/api/admin/rounds").await?;
+    if json {
+        return format::print_json(&rounds);
+    }
     for r in rounds {
         print_round(&r);
     }
@@ -155,12 +169,15 @@ pub async fn round_action(c: &Client, id: i64, action: &str, minutes: Option<u32
     Ok(())
 }
 
-pub async fn submissions(c: &Client, round: Option<i64>) -> Result<()> {
+pub async fn submissions(c: &Client, round: Option<i64>, json: bool) -> Result<()> {
     let path = match round {
         Some(r) => format!("/api/admin/submissions?round={r}"),
         None => "/api/admin/submissions".to_owned(),
     };
     let list: Vec<SubmissionInfo> = c.get(&path).await?;
+    if json {
+        return format::print_json(&list);
+    }
     for s in list {
         let verdict = s.verdict.map(format::verdict).unwrap_or("pending");
         let numbers = match (s.time_ms, s.memory_kib) {
@@ -190,4 +207,17 @@ pub async fn rejudge(c: &Client, id: i64) -> Result<()> {
         .await?;
     print_result(&s);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checked_user_name;
+
+    #[test]
+    fn user_names_cannot_change_the_url() {
+        assert_eq!(checked_user_name(" Alice-1 ").unwrap(), "alice-1");
+        for bad in ["a?b", "a/b", "../x", "a#b", ""] {
+            assert!(checked_user_name(bad).is_err(), "{bad}");
+        }
+    }
 }

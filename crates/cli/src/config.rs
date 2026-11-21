@@ -10,6 +10,7 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 use crate::client::normalise_server;
+use crate::errors::NotLoggedIn;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Config {
@@ -78,9 +79,14 @@ impl Config {
     }
 
     pub fn server(&self) -> Result<&str> {
-        self.server
-            .as_deref()
-            .ok_or_else(|| anyhow!("no server configured; run `arena login <server>`"))
+        self.server.as_deref().ok_or_else(|| {
+            NotLoggedIn(
+                "no server configured; run `arena login <server>`, \
+                     or `arena signup <server>` for a new account"
+                    .into(),
+            )
+            .into()
+        })
     }
 }
 

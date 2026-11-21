@@ -13,7 +13,7 @@ pub struct Config {
     pub data_dir: PathBuf,
     pub admin_token: String,
     /// Event code that lets people register themselves on `/join`. `None` disables
-    /// self-registration (the admin creates every user).
+    /// self-registration, so nobody new can join.
     pub join_code: Option<String>,
     /// One judge worker per isolate box. Box `i` is pinned to the `i`-th CPU of
     /// `JUDGE_CPUS` by the container entrypoint.
@@ -24,6 +24,8 @@ pub struct Config {
     pub runs_per_test: u32,
     /// Periodically ask GitHub for the latest release (`ARENA_UPDATE_CHECK=off` disables).
     pub update_check: bool,
+    /// Requests per second allowed from one address (`ARENA_RATE_LIMIT`; 0 disables).
+    pub rate_limit: u32,
 }
 
 impl Config {
@@ -64,6 +66,12 @@ impl Config {
             Some("off" | "false" | "0") => false,
             Some(_) => return Err("ARENA_UPDATE_CHECK must be on or off".into()),
         };
+        let rate_limit = match var("ARENA_RATE_LIMIT") {
+            Some(v) => v
+                .parse()
+                .map_err(|_| "ARENA_RATE_LIMIT must be a whole number (0 disables it)")?,
+            None => crate::net_limit::DEFAULT_RATE_LIMIT,
+        };
         Ok(Config {
             listen,
             data_dir,
@@ -75,6 +83,7 @@ impl Config {
                 .into(),
             runs_per_test,
             update_check,
+            rate_limit,
         })
     }
 }

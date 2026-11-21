@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use arena_judge::JudgeConfig;
+use arena_server::net_limit::{LimitedListener, Peer};
 use arena_server::{AppState, Config, IsolateBackend, app, open_db, start_background};
 
 #[tokio::main]
@@ -35,10 +36,14 @@ async fn main() {
     if let Err(e) = start_background(&state).await {
         panic!("cannot start judge workers: {e}");
     }
-    axum::serve(listener, app(state))
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .expect("server error");
+    // The peer address is what the rate limits count by.
+    axum::serve(
+        LimitedListener::new(listener),
+        app(state).into_make_service_with_connect_info::<Peer>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .expect("server error");
 }
 
 /// Ctrl-C, or SIGTERM from `docker compose stop` (the server is PID 1 in its container).

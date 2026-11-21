@@ -4,7 +4,7 @@ mod common;
 
 use std::time::Duration;
 
-use arena_protocol::{Board, SubmissionInfo, SubmissionStatus, UserToken, Verdict};
+use arena_protocol::{Board, SubmissionInfo, SubmissionStatus, Verdict};
 use axum::http::StatusCode;
 use common::{ADMIN, TestServer, fake_solution};
 use serde_json::json;
@@ -20,10 +20,7 @@ async fn server() -> TestServer {
 }
 
 async fn user(s: &TestServer, name: &str) -> String {
-    let (_, body) = s
-        .post("/api/admin/users", Some(ADMIN), json!({"name": name}))
-        .await;
-    serde_json::from_value::<UserToken>(body).unwrap().token
+    s.participant(name).await
 }
 
 async fn start_round(s: &TestServer, extra: serde_json::Value) -> i64 {
