@@ -12,6 +12,59 @@ sandbox and keeps live time and memory leaderboards per problem, in the terminal
 > **Status: v0, untested in a real event.** Everything in [PLAN.md](PLAN.md) is
 > built and covered by tests; run a mock contest before relying on it.
 
+## Participant quickstart
+
+This is the handout for participants. They do not need Rust or Docker if they
+use a `#!` script such as Python.
+
+1. Install `arena`:
+
+   Linux or macOS:
+
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.sh | sh
+   export PATH="$HOME/.local/bin:$PATH"  # if `arena` is not found afterwards
+   arena --version
+   ```
+
+   Windows PowerShell:
+
+   ```powershell
+   irm https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.ps1 | iex
+   arena --version
+   ```
+
+2. Create an account. Use the server address and event code announced by the
+   organiser:
+
+   ```sh
+   arena signup http://<host>:8080
+   ```
+
+   Alternatively, create the account at `http://<host>:8080/join`, then run
+   `arena login http://<host>:8080`.
+
+3. Inspect the round and submit a first Python solution:
+
+   ```sh
+   arena round
+   arena problem sum --samples samples
+   cat > solution.py <<'PY'
+   #!/usr/bin/env python3
+   import sys
+
+   numbers = map(int, sys.stdin.buffer.read().split())
+   next(numbers)                         # n
+   print(sum(numbers))
+   PY
+   arena submit sum solution.py --src solution.py
+   arena board
+   ```
+
+   The board ranks accepted solutions by CPU time and peak memory. For C, C++,
+   Rust, or another compiled language, use `arena build` only if Docker is
+   installed locally; the Python path above is the quickest first submission.
+
 ## Hosting a contest
 
 Requirements: a Linux host with cgroup v2 (any current distribution), Docker
@@ -23,6 +76,7 @@ git clone https://github.com/hugoocoto/runtime-arena
 cd runtime-arena
 cp .env.example .env      # set ARENA_ADMIN_TOKEN (openssl rand -hex 32), ARENA_JOIN_CODE, JUDGE_CPUS
 chmod 600 .env
+scripts/host-preflight.sh
 docker compose up -d
 ```
 
@@ -98,9 +152,9 @@ On Windows, in PowerShell:
 irm https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.ps1 | iex
 ```
 
-Both verify the download against the release's `SHA256SUMS` and need no admin
-rights. They install to `~/.local` (`%LOCALAPPDATA%\Programs\arena` on Windows);
-set `PREFIX` to change it, or `VERSION` to pick a release.
+Both verify the download against the release's `SHA256SUMS` and usually need no
+admin rights. They install to `~/.local/bin` (`%LOCALAPPDATA%\Programs\arena` on
+Windows); set `PREFIX` to change it, or `VERSION` to pick a release.
 
 Or download an archive from the
 [releases](https://github.com/hugoocoto/runtime-arena/releases), unpack it, and run
@@ -110,11 +164,12 @@ completions. On Windows, `arena completions powershell` prints its completions.
 
 ## Participating
 
-Create your account with the event code the organiser announced (or on
-`http://<host>:8080/join`). It logs you in:
+For the shortest path, follow [Participant quickstart](#participant-quickstart).
+The full command reference is below. Create your account with the event code
+the organiser announced (or on `http://<host>:8080/join`).
 
 ```sh
-arena signup <host>:8080
+arena signup http://<host>:8080
 arena round                         # problems and time left
 arena problem sum --samples samples # statement; samples saved as samples/01.in ...
 arena build -- gcc -O2 -o sol sol.c # build in the judge's environment (Docker)
