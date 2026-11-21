@@ -27,10 +27,12 @@ docker compose up -d
 
 Open `http://<host>:8080/` on the projector, and announce `http://<host>:8080/join`
 and the event code (`ARENA_JOIN_CODE`): participants create their own accounts
-there. Then, with the `arena` CLI:
+there. Then, with the `arena` CLI (download the executable for your platform
+from the [releases](https://github.com/hugoocoto/runtime-arena/releases)):
 
 ```sh
-arena login --admin http://<host>:8080 <ARENA_ADMIN_TOKEN>
+arena login --admin                           # on the host, from this directory (reads .env)
+# from another machine: arena login --admin http://<host>:8080 <ARENA_ADMIN_TOKEN>
 arena admin problem add problems/sum          # a directory: problem.toml, statement.md, tests/
 arena admin user add alice --display-name "Alice"   # optional: an account made by you; prints its token once
 arena admin round create --name "Round 1" --minutes 60 --freeze 10 sum
