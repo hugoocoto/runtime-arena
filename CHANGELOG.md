@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0](https://github.com/hugoocoto/runtime-arena/compare/v0.6.0...v0.7.0) (2026-11-21)
+
+
+### Features
+
+* improve participant onboarding and host checks ([#15](https://github.com/hugoocoto/runtime-arena/issues/15)) ([5408a2e](https://github.com/hugoocoto/runtime-arena/commit/5408a2efd013a1c379f93d2ebe44a58c4c9f1799))
+
+## [0.6.0](https://github.com/hugoocoto/runtime-arena/compare/v0.5.0...v0.6.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove admin-created accounts, POST /api/admin/users, /api/admin/users/{name}/token and arena login <server> <token>. CLI failures now use exit codes 2-7.
+
+### Features
+
+* add CLI accounts, rate limits, completions, man pages and installers ([#13](https://github.com/hugoocoto/runtime-arena/issues/13)) ([8448683](https://github.com/hugoocoto/runtime-arena/commit/84486837109d6b90a2d8c5d791994d16c9dccd94))
+
 ## [0.5.0](https://github.com/hugoocoto/runtime-arena/compare/v0.4.0...v0.5.0) (2026-11-21)
 
 
