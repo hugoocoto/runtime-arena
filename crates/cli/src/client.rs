@@ -5,6 +5,8 @@ use arena_protocol::{ApiError, ServerEvent, ServerInfo};
 use futures_util::StreamExt;
 use reqwest::{Method, RequestBuilder, Response, StatusCode};
 use rustls::RootCertStore;
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::pem::PemObject;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
@@ -309,8 +311,7 @@ impl Client {
             return Ok(None);
         };
         let mut roots = RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        let mut reader = std::io::Cursor::new(ca);
-        for certificate in rustls_pemfile::certs(&mut reader) {
+        for certificate in CertificateDer::pem_slice_iter(ca) {
             roots.add(certificate?)?;
         }
         let config = rustls::ClientConfig::builder()
