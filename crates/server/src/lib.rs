@@ -22,7 +22,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use arena_protocol::{ServerEvent, ServerInfo};
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{get, post, put};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
@@ -141,6 +141,7 @@ pub fn app(state: AppState) -> Router {
             put(problems::upload).layer(DefaultBodyLimit::max(MAX_PROBLEM_UPLOAD)),
         )
         .route("/rounds", get(rounds::list).post(rounds::create))
+        .route("/rounds/{id}", delete(rounds::remove))
         .route("/rounds/{id}/start", post(rounds::start))
         .route("/rounds/{id}/stop", post(rounds::stop))
         .route("/rounds/{id}/extend", post(rounds::extend))

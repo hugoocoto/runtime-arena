@@ -253,6 +253,11 @@ impl Client {
         Ok(())
     }
 
+    pub async fn delete_empty(&self, path: &str) -> Result<()> {
+        self.send(self.request(Method::DELETE, path)).await?;
+        Ok(())
+    }
+
     pub async fn put_bytes<T: DeserializeOwned>(&self, path: &str, body: Vec<u8>) -> Result<T> {
         let req = self
             .request(Method::PUT, path)

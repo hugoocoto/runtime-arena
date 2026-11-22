@@ -225,6 +225,11 @@ pub enum RoundCommand {
         #[arg(value_parser = whole_number)]
         minutes: Option<u32>,
     },
+    /// Remove a draft or finished round and its submissions.
+    Delete {
+        #[arg(value_parser = positive_id)]
+        id: Option<i64>,
+    },
 }
 
 fn positive_id(s: &str) -> Result<i64, String> {

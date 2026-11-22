@@ -84,7 +84,13 @@ from participants. The judge container runs **privileged**; read
 ```sh
 git clone https://github.com/hugoocoto/runtime-arena
 cd runtime-arena
-cp .env.example .env      # set ARENA_ADMIN_TOKEN, ARENA_JOIN_CODE, ARENA_DOMAIN, JUDGE_CPUS
+cp .env.example .env
+$EDITOR .env              # set ARENA_ADMIN_TOKEN, ARENA_JOIN_CODE, ARENA_DOMAIN, JUDGE_CPUS
+```
+
+After editing `.env`, start the host:
+
+```sh
 chmod 600 .env
 scripts/host-preflight.sh
 scripts/deploy.sh
@@ -96,6 +102,18 @@ to this host, and ports 80 and 443 must be open. For a private rehearsal,
 `ARENA_DOMAIN=localhost` uses Caddy's local CA instead. The organiser's CLI keeps
 using `http://localhost:${ARENA_PORT}` through the local-only port; participants
 use `https://<domain>`.
+
+For a localhost rehearsal, trust the CA in the CLI before signing up:
+
+```sh
+arena trust https://localhost
+arena signup https://localhost
+```
+
+The projector browser also needs the CA installed in its operating-system trust
+store. Export it after Caddy starts with
+`docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt arena-local-ca.crt`,
+then import `arena-local-ca.crt` into that machine's trusted root certificates.
 
 Open `https://<domain>/` on the projector, and announce
 `https://<domain>/join` and the event code (`ARENA_JOIN_CODE`): participants
@@ -117,6 +135,30 @@ only notifies you, in its logs, after `arena login --admin`, and with
 `arena admin update`; to update, change `ARENA_VERSION` in `.env`, then run
 `scripts/deploy.sh`.
 Set `ARENA_UPDATE_CHECK=off` in `.env` to disable the check.
+
+### Reusing or resetting a host
+
+To host another contest on the same deployment, leave the data volume in place,
+change `ARENA_JOIN_CODE` if needed, and run `scripts/deploy.sh`. Create and start
+a new round; old rounds and accounts remain available.
+
+Remove a draft or finished round, including its submissions, with:
+
+```sh
+arena admin round delete <round-id>
+```
+
+Running rounds cannot be deleted, and a round with queued submissions must finish
+judging first. To erase the entire contest, make a backup first, then reset the
+Compose volumes and deploy again. This also creates a new localhost CA:
+
+```sh
+scripts/backup.sh /path/to/backups
+docker compose down -v
+scripts/deploy.sh
+```
+
+Run `arena trust https://localhost` again after that reset.
 
 Check the deployment from a second machine with `curl https://<domain>/healthz`.
 Before an event, make a consistent data backup with
