@@ -173,6 +173,12 @@ pub async fn round_action(c: &Client, id: i64, action: &str, minutes: Option<u32
     Ok(())
 }
 
+pub async fn round_delete(c: &Client, id: i64) -> Result<()> {
+    c.delete_empty(&format!("/api/admin/rounds/{id}")).await?;
+    println!("Round {id} removed.");
+    Ok(())
+}
+
 pub async fn submissions(c: &Client, round: Option<i64>, json: bool) -> Result<()> {
     let path = match round {
         Some(r) => format!("/api/admin/submissions?round={r}"),

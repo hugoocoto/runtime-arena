@@ -132,6 +132,7 @@ API (part A):
 | PUT | `/api/admin/problems/{slug}` (`.tar.gz` body) | admin |
 | GET, POST | `/api/admin/rounds` | admin |
 | POST | `/api/admin/rounds/{id}/start`, `/stop`, `/extend` | admin |
+| DELETE | `/api/admin/rounds/{id}` | admin |
 | GET | `/join` (sign-up page) | anyone |
 | POST | `/api/signup` (needs the event code), `/api/login` | anyone |
 
@@ -163,7 +164,7 @@ arena submissions [id]
 arena board                             # TUI: time / memory / scatter / rank-over-time / mine
 arena admin user list | reset-password <name>
 arena admin problem add <dir> [--slug] [--rejudge] | list
-arena admin round create|list|start|stop|extend
+arena admin round create|list|start|stop|extend|delete
 arena admin submissions [--round] | source <id> | rejudge <id>
 arena completions <shell>
 ```
