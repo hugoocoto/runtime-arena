@@ -2,76 +2,352 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#040818">
 <title>Runtime Arena</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABk0lEQVR42u2aMW7DMAxFPXTIkqVdigK5QKYCPYiv1KmX6HF6gV4ja/bAhQYWDCOZ/JTtiIEMfBiRTfk/fcWOHQ8DW552r1MEDbklbRh/phC6gSDzx69l9Db+utcWXUGg5tcyheofomb0yaQHjuSFVAFqzK058q4E1p7TiwBsGf9mCbQ48lUJtKRsAuj08VxFeR/o/uYELEp158sEi0xZ60sQcALS/P4wugGQejMAMvLp4DUASD2cgGZ+9/xRBYDWL5qABkDtXFaAUk0HQADSNhIKUGrfFIDOMB2gA3SAIADfp+lKOQC5T2lbqV0CvLx/xgYImwCN/EMkkCB6AvdIgEOYAHK3ePcA4DInkNrlwTVZAOZkqSGIWQC6a/I8NZYASL2lRgXgt3zhAGoO3iQAIv64xNOHpYbMLw7Azw6ePiw13LwKgEiep9E++LSb24ebV7/EiOQVkiCQeq1Gmod/SpC53BVRW5Pk51rdALRgqgpgbuQ9680BWjBVnUCU6aMmEEFwAs0C8H/rw43+w7zsEfl1mz9mn84nB/BaeAAAAABJRU5ErkJggg==">
 <style>
-  :root {
-    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #6b7280;
-    --line: #e3e6eb; --accent: #2563eb; --gold: #b7791f; --frozen: #0e7490;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b2;
-      --line: #262b35; --accent: #60a5fa; --gold: #f6c453; --frozen: #67e8f9;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b2;
-    --line: #262b35; --accent: #60a5fa; --gold: #f6c453; --frozen: #67e8f9;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-size: clamp(14px, 1.3vw, 26px);
-  }
-  header {
-    display: flex; flex-wrap: wrap; align-items: baseline; gap: .5em 2em;
-    padding: 1em 1.5em; border-bottom: 1px solid var(--line);
-  }
-  h1 { margin: 0; font-size: 1.6em; }
-  .clock { font-variant-numeric: tabular-nums; font-size: 1.6em; font-weight: 700; margin-left: auto; }
-  .status { color: var(--muted); }
-  .frozen { color: var(--frozen); font-weight: 600; }
-  nav { display: flex; gap: .5em; padding: .75em 1.5em 0; flex-wrap: wrap; }
-  nav button {
-    font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
-    padding: .25em .9em; border-radius: 999px; cursor: pointer;
-  }
-  nav button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24em), 1fr)); gap: 1.5em; padding: 1.5em; }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: .75em; padding: 1em 1.25em; }
-  h2 { margin: 0 0 .5em; font-size: 1.15em; color: var(--muted); font-weight: 600; }
-  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { padding: .35em .4em; text-align: right; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 500; font-size: .85em; }
-  td.name, th.name { text-align: left; width: 100%; }
-  tr.first td { color: var(--gold); font-weight: 700; }
-  tr.moved td { animation: flash 1.5s ease-out; }
-  @keyframes flash { from { background: color-mix(in srgb, var(--accent) 30%, transparent); } to { background: transparent; } }
-  .empty { color: var(--muted); padding: 1em 0; }
-  footer { padding: 0 1.5em 1em; color: var(--muted); font-size: .8em; }
-  footer a { color: inherit; }
-  @media (prefers-reduced-motion: reduce) { tr.moved td { animation: none; } }
+@font-face{font-family:"Jersey 10";font-display:swap;src:url(data:font/woff2;base64,d09GMgABAAAAAA7wAA4AAAAAN0wAAA6WAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGlobhFAcgVwGYACDfBEICsw0u0ULggAAATYCJAODfAQgBYQ8B4kMG+wsM6N2lJO6Esn/LYGTMaQcv2U2IJREACgxRSjobnWtp9Ybuxn3+FWGyqdz4bTDZqbjCsGk2K3X/MpvISb3j5BkFv7p63rPfd0zX3YAYCorcEWtktqLHpozL20fgFNkCJVSIjWNQqKampp+N0Qc3B5BCgkHALmV/QQA8O+Zlyfqi/oqKiZm19tMnf2XPe5m75vFgDxAPeIt4X+VAFJAPeItQsmK3+K2eAvhroe6Ir/HbGPzRPiHMdt/ZZccrYglWIo4Bx7gjP9U46z196oGAit+H1CcK30dXdN8uVKHJcXcGkRuaNjrXc/nsYZINmHM/k9n2QoPWAHEorHDJWCZprT/l0Y7GvmUd9aiFg5Ih+SAR9K+J5jk2XsOAlWAJTUlUNNxl6JqUefYgGVrqMbyMwPWtd+n1Uw1j7v3WN1jV0TYQ8TVIM1fPtN+YxEGXwCgCQoeiAAQQe5BRHsGEY8HIpMfRHMJEB1kQHQxADHeBhUhwB2DGG8OIMCTZCqUBo1adOB4RN8JozjGBkg74HADu4ABPsEznCRDuP88zjEOxCHe5KldT5lWyoLRadFxpC34whAPzTsMnggPwIsAewS5dOratXO37l0ERb2W70I5BhX98AJaBkJbQGgdQGD+wcQUG8DHoymZnyT31Ut9s9kmoOtM3nl8K9RFx55jmomV/ol7q89pApeK5vWulLsorsmazLIL/SHQHFc5yfhMVHZo8MHTDAgyIEIMCmFfDJVCSjRKaGxTxWaX+vyOaS7iSkzCnXzkx2e35kXTAC9w+V0ktX0tBZ33krEoLVu3iOd0oi0B5aVQeLG9senff+QYLpfsP4JjAjP3gzvowIMxcojkFziRKPdPU7W9t4UIZA0gGTuy09BNibelJUfrgSl5hS1DVL67bZL0EQdYqywfgKHVg+sVhcG5nDceGA3+FerPxSvx/dlG/i0Ne5gmA1gPMF3Mu34BBc6yxYJZQdOg6QWtY2yL+Ne2++SM3BSkBzHFlVAyKaWVRT61VFt1V18N1CwTZbTml7lrybIt99iF7+b3838jXwXyVKiexZFAEimkkV52NVMbdVAvDdAwE/7LwLLkOfKn5zT+r5fqunysf2GO+2RivOGBh8sBlX+Kch45DV19AxMzC2+s4bLJbnvsc43i/+cF4AZgU41KlS1qbFPLLnXsUNsede1TzxENHdLAMY0cUN8JjZ3xO+VzLuBKyLWwSxeCbkTdirmXcCfuQdKjlGcZT9JeZNHlwXIYClhKmIrYyriqOCoE6iQQIk0yGLEWKZQCQa1LQ6fPYECPxFMj1KDSIYdTatPqgdB/JwDMBoB/UBTA+xX4rgIA/AHAYJCAXJVEmkmBESEuaqqvqK325BDTIFa5ypOrq4YtY/Ev/FFMDqTyaOvBlW8tVr1ZS6WE91Xz3Wo3Wmmhe5PUtyjZn55AnwqK3ofM+SGo80vr1SpXBU+S5xd7XbRptIyG+sXzxYS5ClQ0lBocp833KjnwolnqgQd1eVQmuYGbG+LGRVm33GHDbXG+Sa6gWmZwdetaO0Prg8KpXqs02s3eLF9JWqk7XfmcJXhwj9NOBvq8IDpDS1MBD0zOf2Q7XV9CgBtYqjcVmt8s9Mt4UBmXKjUqGISNqRleCISA8A+NcnGovNagD+qtDXw8k2K9XzICd0Q5SDiteTJAzph5QUYFTY3jA2ShXXV7GNiZoW2CqoTvZoFTQ2ICBoJDDQZidKXtDK8CCGAzo9C5A99JQy+4ZJNLnMlrHsPwvXaMjZIlgDAQmqg4zRq9AhSChAqdKlAMNbRAny187VLcOcg7p0PWM4Z0NroTLJFJqLaVCYyRCYmflLucjH+IjW02NLxMBoiyejKlRD84QrYYXZmIKDL0RUoreoe91mYkwc0nNG+Zlpi0hshYAgbjnQQT4irSqokPO30EBndQ3sI3e5LgIknZCvQ65nTudmhgmBs5QyJsalb30dJMSqe2EWIKXHEoUTaS7iIJ1YMwFNVSFPnEKRyhoGRtbnpkhCN7WyFW5RqNLDp5vzTcaFHw8IE9/3T5MVytLZdLGumzdOnHFhRIMke3m+5lCyEo3lIN8H4JXmlWJLhjYqtsBxpiaZhN4mVbFNtSiLVkR1tiM3U90HlJuNqgUgj/0IFRUkp2jvqA0DowEOwNkjMwsknUuQOMNTtMFu3/eXOKcqYGL+NrkWzOIDwN02kS1YUYW/FMG3YIUbV/iUrWrJA+c8mimT7mJaewgDkRXuJVZxQ43lO7HJoRXIRV+lF7x3DKD00XVXaTKBJQMG3HKNE6bnHMIfZz0/+n9pY5XJOynUGcKg+bew2ytj4KkU3KyTsfwJQZfAajXAJhImZoURIu/owYWvmuwGLBE3jA21kIDuYAiTnwl9jw+lZV7OQ4/A2TJ3g4NXvUCszKFMkvfyLlfoPNodJnTAJO1C6L1nei57qNRFSBQYUyYN0QSUie5wQrVsOvJrZYXb2gAr1Jj08JdUgakMG5iHpDK6skTBU8mAkA2OOowC2CeqcKZP/hs1IjNBS2fM9SIk5OtZOx6A/N+0/Il8qPVTiS1N1cpcmcyJHGCyQmJV+9UTnEE8G7hErWC5Hw8fZW3dkjs7LghefA9cZfSBYSuRyKFlKIZP/9NGQWI8zymVM0v/yiZxeDtBIEAKRXP94SAIEyoYN7/S8Vi0bntfR4LG4e/tXYFElaaN0gA1ARnNMLy71uHr6QUmNLYycSbBCA6V7/lWYeZHRoG/1x9Iukz+YCt0ENRnHceoNpQOB5gqo1XmKHeG09hOMcFAbDhczebU1ZZoM3NJMAGlT3Gqaoubhlq9Ke5N6Rybt6fmPgYjESVVN0n/dGgPhg2SUhzHANRDp50p3xZXsvJxmk8NZMv4Si2mpQBU5e8BRh8gJxVgqAcIWK9GrpGk4Pg+PeuAbbyVQ3kfjey7pZM3XRchykJDZgha3vv4tHQl/jGdRQWWCs3KD5KtyxWyuu6FVzIAbFVqMy+9PTny9W7bGVjoDPLwYJRPP6ETEUv2nrZcAwhWEEa4V4Acdhsye80JShQY/ePFLD058XIih9UB4cEDum8KZzb4IAUWSYWxtM8bvNbe4Zk8ehuPDMRGxhrMUJhZRjKNncYjAWl+J8nZe11K7lzhzL9rJR7Rjmu4mFRREdLhB4GiLDfK6aG7jXf43HtM//F/TCfN1uAYiHIGjp10zeOnSlk7XvlACKd3TL+29yvizdhyVknERU+I1zOyRs8wuTRMYXM2TLq6uxO7Hjo3mVT3h1ZV9u2rgEELPaYfaS65j7RGJaq22SWdOnQKgBA4JGgjhLgE94ZRWbUe2qCmt6g6i6QNZzD0QKw3oE6H330scQQlB8DiyasCD0Tshhgs//1jWxxGYJwbGTI553SnVqbom/tqikdkulRjhQd68mSsPWQiuB81bNECRUCbTXsxoI+6qAvDjsTYDkEWkoPSKst0701VxbuLQw7QFPkRk562HQUUjN+N6dmMcWbSuYkzOcyrG01wQzAxkxwLTmQlg9s9Jp2N/wELd+LSHJzii37UkeR8Ak2QsBsyukOcTAfGFGTkGDyVIdCqLJLSPTr2eQXSMGF86hrDwqO0Gtuu1/gSI/MACgR+myYFPqdtqW3U1rDZl3/iHH1zffcs0c45wuKMixS4d7vTvPjQPpyhdIq1XQjttYQhu+A1UlI0fZOgsie0V3Ycw22AFfLLAvfnVGrbFT7s6YX9xKaNVt3m4ZSBqZ7I60ojKGHwpPSjNz+Wa1uUvl2Gg3PQEsg2DCEHcF5KE28oliJmc7c0iWkA5jknUmXtG9/dhBOqxbgc/M5a2RA6hteg8ga4X4pSgZlRevPGGxUJhjWxflhFk8o8lHkqEqCgT8K6g3KUM+1s1t4qSZrWGmrd1YcWsyCGVmkAP2VlTFG1HOF+pFNWZq5mM+F6a3r7PeMZ1Vv+qv7ieOKQB40HR+AR7v6vLw/+Xf0n/YCAAnRtP6jgD9nZCuYMld7vvs6gJ4k3eU+URR3HfFOjwEZTeB1q6zBZri7ydFF90n7qXdqih4G6O3J/6OwoegV9l+IrQBD/8fNfc5sQ8J75N0dvT+xYfCV3a5M/ynr7PgaYA2yfdr1p8tZQuAyMt7uTMIFdkewJEwDvuLwJzub/CV2d+i1P/9bRJ9399BB5n9ncTTUN8SAoaY2MEHxgyklOQQ0YdyY99EF6EJhmMIiROOYAKkjo6+JCcjlngtzFRX3UiGwghDFM5RyUllGBjBVkNU3ZSWknCEtaUwnhmZ6ipVyffXElNrUWvg22VwfRwwb6k/IvpQ9zIqvjwQZ4k5w9K4NELA4Gypgt+PghIsBYeAJZFQNU0JG8A09m9tUhuiWTO71wGOtAKHyAgEGIL0UlMNEk2knrN0rAnlECBakGlvO7FJdUm3uQ/xUUR3i1Xo8vd4NkCyPzKyZPOX36tkMJrMFod+OHR0cu6XU2fOXbh01SPXbty6c+/BoyfPXnrSbzA6BiYWNg4uHj4BIRFxp0lIe0ZGTkHZP0AXapArLR19PxkYmZhZWNnYOTi5eszNw8vHLyAoJCzS0/6IiolLSEpJy8jKySsoKin3XCXLXU1dQ1MLAoXBEd3v4WBfXX9l+w/i09j+b9P0Lc5tBkTUglxPuNW5Al3YqO7e4qZ0s7u/5n4Dnu79GqrNe36N3bfCN/+N/fgy/6a2CD1khc5o3lJsd4mURj6gz+LeW42+lzX4+gZWcNSwTwmd0kTXFDWJXQM68mO9++9PioiPgkN6KtprevBa2mUtPSulvwtcp2zVfmR/ygr5n6HumrNb1x+dWAns9HL8Jfk65bvrVOjbUgqT69anX6/r9ZKm1nKRsJcgOlKOnMoapuC7E18mSokhtfjYLuiWdbd79Mv6xipIOamT2qhsdJpgfJXNpNjuMi2f6lN9qk61eel8/Fybly61pbYav0L7gRxpzjPJSuV/uizLb9jadfIZj0X0vR+c/DdnvbOf2WXpkgIHsAvrpDoAAAA=) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1E00-1E9F,U+1EF2-1EFF,U+20A0-20AB,U+20AD-20C4}
+@font-face{font-family:"Jersey 10";font-display:swap;src:url(data:font/woff2;base64,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) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+FEFF,U+FFFD}
+:root {
+  color-scheme: dark;
+  --ink: #040818; --navy: #081233; --deep: #0d1d4f; --mid: #133080;
+  --blue: #1a4fd0; --bright: #2a86ff; --cyan: #4fc3ff; --ice: #9be9ff; --white: #f2fdff;
+  --px: max(2px, .12rem);
+  --pixel: "Jersey 10", ui-monospace, "DejaVu Sans Mono", monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--ink); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; color: var(--white); background: transparent;
+  font: 400 1rem/1.3 var(--pixel); letter-spacing: .02em;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: none; font-smooth: never;
+}
+#paint { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; image-rendering: pixelated; }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, rgb(4 8 24 / .28) 3px 4px);
+}
+::selection { background: var(--ice); color: var(--ink); }
+:focus-visible { outline: var(--px) solid var(--white); outline-offset: var(--px); }
+a { color: var(--ice); text-underline-offset: .18em; text-decoration-thickness: var(--px); }
+a:hover { color: var(--white); }
+h1, h2, h3, p { margin: 0; }
+code, pre { font-family: var(--pixel); }
+button, input { font: inherit; letter-spacing: inherit; color: inherit; }
+button { cursor: pointer; }
+svg.i { width: 1em; height: 1em; fill: currentColor; shape-rendering: crispEdges; flex: none; display: block; }
+.plate {
+  background: var(--navy);
+  box-shadow: 0 calc(var(--px) * -1) var(--mid), 0 var(--px) var(--mid), calc(var(--px) * -1) 0 var(--mid), var(--px) 0 var(--mid);
+}
+.key {
+  display: inline-block; min-width: 1.4em; padding: 0 .3em; text-align: center; color: var(--ink);
+  background: var(--ice); line-height: 1.2;
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4em; min-height: 2.2rem; padding: 0 .7em;
+  background: var(--deep); border: 0; color: var(--ice); text-decoration: none;
+  box-shadow: inset 0 var(--px) var(--blue), inset 0 calc(var(--px) * -1) var(--ink);
+}
+.btn:hover { background: var(--mid); color: var(--white); }
+.btn:active { transform: translateY(var(--px)); box-shadow: inset 0 var(--px) var(--ink); }
+.btn:disabled { color: var(--cyan); background: var(--navy); cursor: progress; }
+.btn.primary { background: var(--ice); color: var(--ink); box-shadow: inset 0 var(--px) var(--white), inset 0 calc(var(--px) * -1) var(--bright); }
+.btn.primary:hover { background: var(--white); color: var(--ink); }
+.btn.primary:disabled { background: var(--cyan); color: var(--ink); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+html { scrollbar-color: var(--blue) var(--ink); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+html { font-size: clamp(19px, 1.32vw, 40px); }
+body { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: .55rem;
+  padding: max(.6rem, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+@media (min-width: 900px) and (min-height: 560px) { body { height: 100dvh; overflow: hidden; } }
+
+.mast { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.2rem; }
+.brand { display: block; line-height: 0; }
+.brand img { display: block; width: calc(162px * var(--mark)); height: calc(64px * var(--mark)); image-rendering: pixelated; --mark: 1; }
+@media (min-width: 2200px) { .brand img { --mark: 2; } }
+.title { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: .95; font-weight: 400; overflow-wrap: anywhere; text-wrap: balance; }
+#phase { color: var(--ice); font-size: 1.1rem; }
+.time { text-align: right; line-height: .8; }
+#clock { display: inline-block; font-size: clamp(3.4rem, 6.4vw, 7rem); line-height: .8; padding: .08em .12em 0; color: var(--white); text-shadow: .045em .045em 0 var(--blue); }
+#clock.soon { color: var(--ice); }
+#clock.last { background: var(--white); color: var(--ink); text-shadow: none; }
+#clock.word { font-size: clamp(2.2rem, 3.6vw, 4rem); color: var(--ice); text-shadow: none; }
+
+.track { position: relative; height: 1.5rem; }
+.track svg { display: block; width: 100%; height: 100%; }
+.track path { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
+#waveRest { stroke: var(--mid); }
+#waveDone { stroke: var(--ice); }
+#freezeZone { fill: var(--deep); }
+#head { fill: var(--white); }
+
+.deck { display: flex; flex-wrap: wrap; align-items: stretch; gap: .35rem .9rem; }
+#problems { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; flex: 1 1 20rem; }
+.channel { position: relative; display: flex; align-items: center; gap: .4em; min-height: 2.2rem; max-width: 16rem; padding: 0 .65em; border: 0; color: var(--ice);
+  background: var(--deep); box-shadow: inset 0 var(--px) var(--mid); }
+.channel b { font-weight: 400; color: var(--cyan); }
+.channel span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel:hover { background: var(--mid); color: var(--white); }
+.channel[aria-current="true"] { background: var(--ice); color: var(--ink); box-shadow: inset 0 var(--px) var(--white); }
+.channel[aria-current="true"] b { color: var(--blue); }
+.channel i { position: absolute; left: 0; bottom: 0; height: calc(var(--px) * 2); background: var(--blue); width: 0; }
+.controls { display: flex; align-items: center; gap: .25rem; }
+#rotateText { min-width: 7.6em; text-align: center; color: var(--ice); }
+.icon { width: 2.2rem; padding: 0; }
+.find { display: flex; align-items: stretch; background: var(--ink); box-shadow: inset 0 0 0 var(--px) var(--mid); }
+.find:focus-within { box-shadow: inset 0 0 0 var(--px) var(--white); }
+.find label { align-self: center; padding: 0 .1em 0 .55em; color: var(--ice); white-space: nowrap; }
+.find input { width: 8.5em; min-width: 0; background: transparent; border: 0; padding: 0 .4em; outline: 0; caret-color: var(--ice); }
+.find input::placeholder { color: var(--cyan); opacity: 1; }
+#meClear { background: none; border: 0; color: var(--ice); padding: 0 .45em; }
+#meClear:hover { color: var(--white); }
+#views { display: none; }
+
+#notice { display: flex; align-items: center; gap: .8rem; padding: .25rem .7rem; background: var(--white); color: var(--ink); }
+#notice[hidden] { display: none; }
+#notice .btn { min-height: 1.7rem; background: var(--blue); color: var(--white); box-shadow: none; margin-left: auto; }
+#frozenBar { padding: .2rem .7rem; color: var(--ink);
+  background: repeating-linear-gradient(135deg, var(--ice) 0 8px, var(--cyan) 8px 16px); }
+#frozenBar[hidden] { display: none; }
+#frozenBar span { background: var(--ice); padding: 0 .3em; }
+
+.stage { display: flex; flex-direction: column; gap: .4rem; min-height: 0; }
+.boards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.board { container-type: inline-size; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.board header { display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .7rem; padding: .3rem .7rem .15rem; background: var(--deep); }
+.board h2 { font-size: 1.9rem; line-height: 1; font-weight: 400; }
+.board .sub { color: var(--ice); }
+.board .best { margin-left: auto; color: var(--white); font-size: 1.25rem; }
+.scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-color: var(--blue) var(--navy); }
+table { width: 100%; border-collapse: collapse; }
+th { position: sticky; top: 0; z-index: 1; background: var(--navy); color: var(--cyan); font-weight: 400; text-align: right; padding: .1rem .45rem; white-space: nowrap; box-shadow: inset 0 calc(var(--px) * -1) var(--mid); }
+td { padding: 0 .45rem; line-height: 1; height: var(--row, 1.9rem); text-align: right; white-space: nowrap; color: var(--ice); box-shadow: inset 0 -1px var(--deep); }
+th.name, td.name { text-align: left; width: 100%; max-width: 0; }
+td.name { color: var(--white); overflow: hidden; text-overflow: ellipsis; font-size: 1.15rem; }
+th.rank, td.rank { text-align: center; width: 2.2rem; padding: 0 .2rem; }
+td.rank { color: var(--cyan); font-size: 1.15rem; }
+td.main { color: var(--white); font-size: 1.2rem; }
+th.main { color: var(--white); }
+td.lane { padding-block: 0; width: 7.2rem; min-width: 7.2rem; }
+th.lane { text-align: left; }
+.lane svg { display: block; width: 6.6rem; height: .9rem; shape-rendering: crispEdges; overflow: visible; }
+.lane path { fill: none; stroke: var(--bright); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.lane rect { fill: var(--bright); }
+.lane rect.off { fill: var(--deep); }
+tr.first td { height: calc(var(--row, 1.9rem) * 1.35); background: var(--deep); }
+tr.first td.name, tr.first td.main { font-size: 1.5rem; }
+tr.first td.rank { background: var(--white); color: var(--ink); font-size: 1.5rem; }
+tr.first .lane path { stroke: var(--white); }
+tr.first .lane rect:not(.off) { fill: var(--white); }
+tr.me td { background: var(--blue); color: var(--white); }
+tr.me td.rank { background: var(--ice); color: var(--ink); }
+tr.me .lane path { stroke: var(--white); }
+tr.me .lane rect:not(.off) { fill: var(--white); }
+tr.me .lane rect.off { fill: var(--mid); }
+tr.moved td { animation: moved 1.2s steps(5) 1; }
+@keyframes moved { from { background: var(--ice); color: var(--ink); } to { background: inherit; } }
+@container (max-width: 660px) { .lane { display: none; } }
+@container (max-width: 500px) { .gap { display: none; } }
+@container (max-width: 390px) { .other { display: none; } }
+
+.empty { display: grid; align-content: center; justify-items: start; gap: .4rem; height: 100%; min-height: 9rem; padding: 1rem 1.2rem; }
+.empty h3 { font-size: 1.6rem; font-weight: 400; line-height: 1; }
+.empty p { color: var(--ice); max-width: 34em; }
+.empty code { color: var(--white); background: var(--deep); padding: .1em .4em; overflow-wrap: anywhere; }
+#none { flex: 1; display: grid; place-items: center; text-align: left; }
+#none[hidden], .boards[hidden] { display: none; }
+#none > div { display: grid; gap: .6rem; padding: 1.5rem 1.8rem; max-width: 34rem; }
+#none h2 { font-size: 2.2rem; line-height: 1; font-weight: 400; }
+#none p { color: var(--ice); }
+#none .btn { justify-self: start; }
+
+.foot { display: flex; align-items: center; gap: .3rem 1.1rem; flex-wrap: wrap; color: var(--ice); }
+#ticker { flex: 1 1 18rem; min-width: 0; color: var(--white); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ticker time { color: var(--cyan); margin-right: .5em; }
+#ticker.fresh { animation: ping 1.4s steps(6) 1; }
+@keyframes ping { from { background: var(--ice); color: var(--ink); } to { background: transparent; } }
+#link { display: inline-flex; align-items: center; gap: .4em; }
+#dot { width: .55em; height: .55em; background: var(--cyan); }
+#link.live #dot { background: var(--white); animation: tick 1s steps(2) infinite; }
+#link.down { color: var(--white); }
+@keyframes tick { 50% { background: var(--bright); } }
+.foot .linkbtn { background: none; border: 0; padding: 0; color: var(--ice); text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: var(--px); }
+.foot .linkbtn:hover { color: var(--white); }
+
+dialog { width: min(44rem, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 1.1rem 1.3rem; border: 0; color: var(--white); overflow: auto; }
+dialog::backdrop { background: rgb(4 8 24 / .78); }
+dialog h2 { font-size: 2rem; font-weight: 400; line-height: 1; padding-right: 3rem; }
+dialog h3 { margin-top: .9rem; color: var(--ice); font-size: 1.3rem; font-weight: 400; }
+dialog p, dialog li { color: var(--ice); max-width: 62ch; }
+dialog ul { margin: .2rem 0 0; padding-left: 1.1em; }
+dialog form { position: absolute; top: .9rem; right: 1rem; }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .15rem 1rem; margin-top: .3rem; }
+.keys div { display: flex; align-items: center; gap: .55em; color: var(--ice); }
+
+@media (max-width: 899px) {
+  .mast { grid-template-columns: minmax(0, 1fr) auto; gap: .35rem .8rem; }
+  .brand img { width: 122px; height: 48px; }
+  .title { grid-column: 1 / -1; grid-row: 2; }
+  h1 { font-size: 1.7rem; }
+  #clock { font-size: 3.2rem; }
+  #clock.word { font-size: 1.9rem; }
+  #problems { flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; padding-bottom: .15rem; }
+  .channel { flex: none; }
+  .find { flex: 1 1 10rem; }
+  .find input { width: 100%; }
+  #views { display: flex; gap: .25rem; width: 100%; }
+  #views button { flex: 1; }
+  #views button[aria-pressed="true"] { background: var(--ice); color: var(--ink); }
+  .boards { grid-template-columns: minmax(0, 1fr); }
+  .boards[data-view="time"] .memory, .boards[data-view="memory"] .speed { display: none; }
+  .scroll { overflow: visible; }
+  th { top: 0; }
+  #ticker { order: -1; flex-basis: 100%; }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1 id="round">Runtime Arena</h1>
-  <span id="frozen" class="frozen" hidden>Boards frozen</span>
-  <span id="status" class="status">connecting…</span>
-  <span id="clock" class="clock"></span>
-</header>
-<nav id="problems" aria-label="Problems"></nav>
-<main>
-  <section><h2>Fastest (CPU time)</h2><div id="by_time"></div></section>
-  <section><h2>Leanest (peak memory)</h2><div id="by_memory"></div></section>
+<canvas id="paint" aria-hidden="true"></canvas>
+
+<div class="mast">
+  <a class="brand" href="/" aria-label="Runtime Arena home"><img src="data:image/png;base64,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" width="162" height="64" alt="Runtime Arena"></a>
+  <div class="title">
+    <h1 id="round">Connecting</h1>
+    <p id="phase">Looking for the live round</p>
+  </div>
+  <div class="time"><span id="clock" role="timer" aria-live="off"></span></div>
+</div>
+
+<div class="track" aria-hidden="true">
+  <svg viewBox="0 0 1000 24" preserveAspectRatio="none">
+    <defs><clipPath id="elapsed"><rect id="elapsedRect" x="0" y="-2" width="0" height="28"/></clipPath></defs>
+    <rect id="freezeZone" x="1000" y="0" width="0" height="24"/>
+    <path id="waveRest"/>
+    <path id="waveDone" clip-path="url(#elapsed)"/>
+    <rect id="head" x="0" y="0" width="3" height="24"/>
+  </svg>
+</div>
+
+<div class="deck">
+  <nav id="problems" aria-label="Problems"></nav>
+  <div class="controls" id="controls" hidden>
+    <button class="btn icon" id="prev" title="Previous problem (left arrow)" aria-label="Previous problem"><svg class="i" viewBox="0 0 8 8"><path d="M6 0v8H5V7H4V6H3V5H2V3h1V2h1V1h1V0z"/></svg></button>
+    <button class="btn" id="rotate" aria-pressed="false"><svg class="i" viewBox="0 0 8 8"><path id="rotateIcon" d="M1 1h2v6H1zM5 1h2v6H5z"/></svg><span id="rotateText">Next in 20 s</span></button>
+    <button class="btn icon" id="next" title="Next problem (right arrow)" aria-label="Next problem"><svg class="i" viewBox="0 0 8 8"><path d="M2 0h1v1h1v1h1v1h1v2H5v1H4v1H3v1H2z"/></svg></button>
+  </div>
+  <div class="find">
+    <label for="me">Find me</label>
+    <input id="me" list="people" placeholder="your name" autocomplete="off" autocapitalize="none" spellcheck="false">
+    <datalist id="people"></datalist>
+    <button id="meClear" aria-label="Clear name" title="Clear name" hidden><svg class="i" viewBox="0 0 8 8"><path d="M1 1h2v1h2V1h2v2H6v2h1v2H5V6H3v1H1V5h1V3H1z"/></svg></button>
+  </div>
+  <div id="views" role="group" aria-label="Choose leaderboard">
+    <button class="btn" data-view="time" aria-pressed="true">Fastest</button>
+    <button class="btn" data-view="memory" aria-pressed="false">Leanest</button>
+  </div>
+</div>
+
+<main class="stage">
+  <div id="notice" role="alert" hidden><span id="noticeText"></span><button class="btn" id="retry">Retry now</button></div>
+  <div id="frozenBar" hidden><span>Boards are frozen. New results stay hidden until the round ends.</span></div>
+  <div id="none" hidden><div class="plate">
+    <h2 id="noneTitle">No round yet</h2>
+    <p id="noneText">This board goes live as soon as the organiser starts a round. Create your account now so you are ready.</p>
+    <a class="btn primary" href="/join">Join the contest</a>
+  </div></div>
+  <div class="boards" id="boards" data-view="time">
+    <section class="board plate speed" aria-labelledby="timeHead">
+      <header><h2 id="timeHead">Fastest</h2><span class="sub">by CPU time</span><span class="best" id="timeBest"></span></header>
+      <div class="scroll" id="by_time"></div>
+    </section>
+    <section class="board plate memory" aria-labelledby="memHead">
+      <header><h2 id="memHead">Leanest</h2><span class="sub">by peak memory</span><span class="best" id="memBest"></span></header>
+      <div class="scroll" id="by_memory"></div>
+    </section>
+  </div>
 </main>
-<footer>Read-only view. Problems rotate every 20 s; click one to pin it. <a id="source" href="https://github.com/hugoocoto/runtime-arena">Source (AGPL-3.0)</a></footer>
+
+<footer class="foot">
+  <div id="ticker" role="status" aria-live="polite"></div>
+  <span id="youLine" role="status"></span>
+  <span id="link"><span id="dot"></span><span id="linkText">Connecting</span></span>
+  <a href="/join">Join</a>
+  <button class="linkbtn" id="helpBtn">Help <span class="key">?</span></button>
+  <button class="linkbtn" id="fullBtn">Fullscreen</button>
+  <a id="source" href="https://github.com/hugoocoto/runtime-arena">Source (AGPL-3.0)</a>
+</footer>
+
+<dialog id="help" class="plate" aria-labelledby="helpTitle">
+  <h2 id="helpTitle">How this board works</h2>
+  <form method="dialog"><button class="btn icon" aria-label="Close help" title="Close (Esc)"><svg class="i" viewBox="0 0 8 8"><path d="M1 1h2v1h2V1h2v2H6v2h1v2H5V6H3v1H1V5h1V3H1z"/></svg></button></form>
+  <h3>Ranking</h3>
+  <ul>
+    <li>Fastest shows each person's accepted run with the lowest CPU time. Ties go to lower memory, then the earlier submission.</li>
+    <li>Leanest shows each person's accepted run with the lowest peak memory. Ties go to lower CPU time, then the earlier submission.</li>
+    <li>Tries counts every submission for that problem in this round, including rejected ones.</li>
+    <li>A frozen board hides submissions made after the freeze. Everything appears when the round ends.</li>
+  </ul>
+  <h3>Reading the signal</h3>
+  <p>On Fastest, more pulses means a faster run: half the speed of the leader draws half the pulses. Hz is one divided by the CPU time. On Leanest, fewer lit blocks means less memory.</p>
+  <h3>Keyboard</h3>
+  <div class="keys">
+    <div><span class="key">Left</span><span class="key">Right</span> change problem</div>
+    <div><span class="key">1</span>to<span class="key">9</span> jump to a problem</div>
+    <div><span class="key">Space</span> pause or resume rotation</div>
+    <div><span class="key">/</span> find your name</div>
+    <div><span class="key">F</span> fullscreen</div>
+    <div><span class="key">?</span> open this help</div>
+  </div>
+</dialog>
+
 <script>
 "use strict";
-const state = { round: null, boards: {}, selected: null, pinned: false, previous: {}, offset: 0 };
+function paintBackground() {
+  const canvas = document.getElementById("paint");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const cell = Math.max(3, Math.ceil(innerWidth / 640));
+  const w = canvas.width = Math.ceil(innerWidth / cell);
+  const h = canvas.height = Math.ceil(innerHeight / cell);
+  const image = ctx.createImageData(w, h);
+  const ramp = [[4, 8, 24], [8, 18, 51], [8, 18, 51], [13, 29, 79], [13, 29, 79], [19, 48, 128]];
+  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const scale = Math.min(w, h) * .72;
+  for (let y = 0, i = 0; y < h; y++) {
+    for (let x = 0; x < w; x++, i += 4) {
+      const u = (x - w / 2) / scale, v = (y - h / 2) / scale;
+      const r = Math.hypot(u, v), a = Math.atan2(v, u);
+      const phase = 11.4 * r ** 1.55 + 3 * a + 1.6 * Math.sin(2.4 * r - 2 * a) + .6 * Math.sin(5 * u + 3 * v);
+      const fade = Math.max(.2, Math.min(1, 1.08 - .34 * r));
+      const core = Math.min(1, r / .2);
+      const value = (Math.sin(phase) + 1) / 2 * fade * core + (bayer[(y % 4) * 4 + x % 4] / 16 - .47) * .2;
+      const c = ramp[Math.max(0, Math.min(ramp.length - 1, Math.floor(value * ramp.length)))];
+      image.data[i] = c[0]; image.data[i + 1] = c[1]; image.data[i + 2] = c[2]; image.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+}
+paintBackground();
+let paintTimer;
+addEventListener("resize", () => { clearTimeout(paintTimer); paintTimer = setTimeout(paintBackground, 150); });
+
+const ROTATE_SECONDS = 20;
+const state = { ready: false, connected: false, round: null, boards: {}, selected: null, pinned: false, previous: {},
+  offset: 0, rotateLeft: ROTATE_SECONDS, me: "", lastData: null };
 const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
+  set(k, v) { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch {} },
+};
+const svgNS = "http://www.w3.org/2000/svg";
+function svg(tag, attrs) { const n = document.createElementNS(svgNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; }
+function cell(text, cls) { const td = document.createElement("td"); if (text !== undefined) td.textContent = text; if (cls) td.className = cls; return td; }
 
 function trim(n) { return n.toFixed(3).replace(/\.?0+$/, ""); }
 function fmtTime(us) {
@@ -84,66 +360,225 @@ function fmtMem(kib) {
   if (kib >= 1024) return (kib / 1024).toFixed(1) + " MiB";
   return kib + " KiB";
 }
+function fmtHz(us) {
+  if (!us) return "";
+  const hz = 1000000 / us;
+  if (hz >= 1000000) return trim(hz / 1000000) + " MHz";
+  if (hz >= 1000) return (hz / 1000).toPrecision(3) + " kHz";
+  return hz.toPrecision(3) + " Hz";
+}
 function fmtLeft(s) {
   s = Math.max(0, s);
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
   const pad = (n) => String(n).padStart(2, "0");
   return (h ? h + ":" + pad(m) : m) + ":" + pad(sec);
 }
+function clockText(d) { return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+function ordinal(n) { const v = n % 100; return n + (["th", "st", "nd", "rd"][(v - 20) % 10] || ["th", "st", "nd", "rd"][v] || "th"); }
+function nowServer() { return Math.floor(Date.now() / 1000) + state.offset; }
 function problems() { return state.round ? state.round.problems.map((p) => p.slug) : Object.keys(state.boards).sort(); }
+function titleOf(slug) { return state.round?.problems.find((p) => p.slug === slug)?.title ?? slug; }
+function isFrozen() { return Object.values(state.boards).some((b) => b.frozen); }
+
+const waves = (() => {
+  let edges = [], x = 0, half = 44;
+  while (x < 1000) { edges.push(Math.round(x)); x += Math.max(5, half); half *= .968; }
+  edges.push(1000);
+  let d = "M0 21";
+  edges.slice(1).forEach((e, i) => { const y = i % 2 ? 21 : 3; d += "H" + e + (e < 1000 ? "V" + (i % 2 ? 3 : 21) : ""); void y; });
+  return d;
+})();
+$("waveRest").setAttribute("d", waves);
+$("waveDone").setAttribute("d", waves);
+
+function renderTrack() {
+  const r = state.round;
+  let done = 0, freeze = 0;
+  if (r?.state === "finished") done = 1;
+  if (r?.state === "running" && r.started_at && r.ends_at > r.started_at) {
+    const span = r.ends_at - r.started_at;
+    done = Math.max(0, Math.min(1, (nowServer() - r.started_at) / span));
+    freeze = Math.min(1, r.freeze_minutes * 60 / span);
+  }
+  $("elapsedRect").setAttribute("width", done * 1000);
+  $("head").setAttribute("x", Math.min(997, done * 1000));
+  $("freezeZone").setAttribute("x", 1000 - freeze * 1000);
+  $("freezeZone").setAttribute("width", freeze * 1000);
+}
 
 function renderHeader() {
-  const r = state.round;
-  $("round").textContent = r ? r.name : "Runtime Arena";
-  $("frozen").hidden = !Object.values(state.boards).some((b) => b.frozen);
-  // Server clock, so a projector laptop with a wrong clock still counts down right.
-  const now = Math.floor(Date.now() / 1000) + state.offset;
-  if (!r) $("clock").textContent = "";
-  else if (r.state === "running") $("clock").textContent = fmtLeft(r.ends_at - now);
-  else $("clock").textContent = r.state === "finished" ? "finished" : "not started";
+  const r = state.round, clock = $("clock");
+  $("round").textContent = r ? r.name : state.ready ? "Runtime Arena" : "Connecting";
+  document.title = r ? r.name + " | Runtime Arena" : "Runtime Arena";
+  clock.className = "";
+  if (!r) { clock.textContent = ""; $("phase").textContent = state.ready ? "Waiting for a round" : "Looking for the live round"; }
+  else if (r.state === "running") {
+    const left = r.ends_at - nowServer();
+    clock.textContent = fmtLeft(left);
+    clock.className = left <= 60 ? "last" : left <= 300 ? "soon" : "";
+    clock.setAttribute("aria-label", "Time left " + fmtLeft(left));
+    const count = r.problems.length;
+    $("phase").textContent = (isFrozen() ? "Frozen" : "Running") + ", " + count + (count === 1 ? " problem" : " problems");
+  } else {
+    clock.textContent = r.state === "finished" ? "Finished" : "Not started";
+    clock.className = "word";
+    clock.removeAttribute("aria-label");
+    $("phase").textContent = r.state === "finished" ? "Final results" : r.duration_minutes + " minutes once the organiser starts it";
+  }
+  $("frozenBar").hidden = !(r?.state === "running" && isFrozen());
+  renderTrack();
+}
+
+function select(slug, pin) {
+  state.selected = slug;
+  state.rotateLeft = ROTATE_SECONDS;
+  if (pin) { state.pinned = true; try { history.replaceState(null, "", "#" + slug); } catch {} }
+  for (const id of ["by_time", "by_memory"]) $(id).scrollTop = 0;
+  render();
+}
+function step(delta) {
+  const list = problems();
+  if (!list.length) return;
+  select(list[(list.indexOf(state.selected) + delta + list.length) % list.length], true);
+}
+function setPinned(pinned) {
+  state.pinned = pinned; state.rotateLeft = ROTATE_SECONDS;
+  if (!pinned) { try { history.replaceState(null, "", location.pathname); } catch {} }
+  renderRotate();
 }
 
 function renderNav() {
   const nav = $("problems");
-  nav.replaceChildren(...problems().map((slug) => {
+  const buttons = problems().map((slug, i) => {
     const b = document.createElement("button");
-    const title = state.round?.problems.find((p) => p.slug === slug)?.title ?? slug;
-    b.textContent = title;
-    b.setAttribute("aria-pressed", String(slug === state.selected));
-    b.onclick = () => { state.selected = slug; state.pinned = true; render(); };
+    const n = document.createElement("b"); n.textContent = i + 1;
+    const t = document.createElement("span"); t.textContent = titleOf(slug);
+    const bar = document.createElement("i");
+    b.className = "channel";
+    b.title = titleOf(slug);
+    b.append(n, t, bar);
+    if (slug === state.selected) b.setAttribute("aria-current", "true");
+    b.onclick = () => select(slug, true);
+    b.dataset.slug = slug;
     return b;
-  }));
+  });
+  const focused = document.activeElement?.dataset?.slug;
+  nav.replaceChildren(...buttons);
+  if (focused) nav.querySelector(`[data-slug="${CSS.escape(focused)}"]`)?.focus();
+  $("controls").hidden = problems().length < 2;
+  renderRotate();
+}
+function renderRotate() {
+  const paused = state.pinned;
+  $("rotate").setAttribute("aria-pressed", String(paused));
+  $("rotate").title = paused ? "Resume rotation (Space)" : "Pause rotation (Space)";
+  $("rotateIcon").setAttribute("d", paused ? "M2 1h1v1h2v1h2v2H5v1H3v1H2z" : "M1 1h2v6H1zM5 1h2v6H5z");
+  $("rotateText").textContent = paused ? "Resume" : "Next in " + state.rotateLeft + " s";
+  const bar = document.querySelector(".channel[aria-current] i");
+  if (bar) bar.style.width = paused ? "0" : Math.round((ROTATE_SECONDS - state.rotateLeft) / ROTATE_SECONDS * 100) + "%";
 }
 
-function renderTable(target, entries) {
-  const el = $(target);
-  if (!entries || entries.length === 0) {
-    el.innerHTML = '<p class="empty">No accepted solutions yet.</p>';
-    return;
+function pulsePath(n) {
+  const w = 100, h = 12;
+  const half = w / (2 * n);
+  let d = "M0 " + h, x = 0;
+  for (let i = 0; i < n; i++) {
+    d += "H" + (x + half / 2).toFixed(2) + "V0H" + (x + half * 1.5).toFixed(2) + "V" + h;
+    x += half * 2;
   }
-  // Remember ranks per problem, so switching problems doesn't flash every row.
+  return d + "H" + w;
+}
+function speedLane(entry, best) {
+  const pulses = Math.max(1, Math.round(16 * best / Math.max(1, entry.time_us)));
+  const s = svg("svg", { viewBox: "0 0 100 12", preserveAspectRatio: "none", "aria-hidden": "true" });
+  s.append(svg("path", { d: pulsePath(pulses) }));
+  return s;
+}
+function memoryLane(entry, worst) {
+  const lit = Math.max(1, Math.ceil(16 * entry.memory_kib / Math.max(1, worst)));
+  const s = svg("svg", { viewBox: "0 0 128 12", "aria-hidden": "true" });
+  for (let i = 0; i < 16; i++) s.append(svg("rect", { x: i * 8, y: 0, width: 6, height: 12, class: i < lit ? "on" : "off" }));
+  return s;
+}
+function isMe(e) {
+  const q = state.me.trim().toLowerCase();
+  return !!q && (e.user.toLowerCase() === q || e.display_name.toLowerCase() === q);
+}
+
+function renderEmpty(el, kind) {
+  const r = state.round, slug = state.selected;
+  const box = document.createElement("div"); box.className = "empty";
+  const h = document.createElement("h3"), p = document.createElement("p");
+  if (r?.state === "draft") { h.textContent = "Round not started"; p.textContent = "Results appear here once the organiser starts the round."; box.append(h, p); }
+  else if (r?.state === "finished") { h.textContent = "No accepted runs"; p.textContent = "Nobody solved this problem in this round."; box.append(h, p); }
+  else {
+    h.textContent = kind === "time" ? "No fastest run yet" : "No leanest run yet";
+    p.textContent = "The first accepted solution takes this spot. Submit yours:";
+    const c = document.createElement("code"); c.textContent = "arena submit " + (slug ?? "<problem>") + " ./solution";
+    box.append(h, p, c);
+  }
+  el.replaceChildren(box);
+}
+
+function renderTable(target, entries, kind) {
+  const el = $(target);
+  if (!entries || entries.length === 0) { renderEmpty(el, kind); return; }
   const key = state.selected + "/" + target;
   const prev = state.previous[key] || {};
-  const table = document.createElement("table");
-  table.innerHTML = '<thead><tr><th>#</th><th class="name">Name</th><th>Time</th><th>Memory</th><th>Subs</th></tr></thead>';
-  const body = document.createElement("tbody");
+  const best = kind === "time" ? entries[0].time_us : entries[0].memory_kib;
+  const worst = Math.max(...entries.map((e) => e.memory_kib));
+  let table = el.querySelector("table");
+  if (!table) {
+    table = document.createElement("table");
+    const main = kind === "time" ? "Time" : "Memory", other = kind === "time" ? "Memory" : "Time";
+    table.innerHTML = '<thead><tr><th class="rank" scope="col"><span class="sr">Rank</span>#</th><th class="name" scope="col">Name</th>' +
+      '<th class="lane" scope="col">' + (kind === "time" ? "Signal" : "Footprint") + '</th><th class="main" scope="col">' + main + '</th>' +
+      '<th class="gap" scope="col">Gap</th><th class="other" scope="col">' + other + '</th><th scope="col">Tries</th></tr></thead><tbody></tbody>';
+    el.replaceChildren(table);
+  }
   const ranks = {};
-  for (const e of entries) {
+  const rows = entries.map((e) => {
     const tr = document.createElement("tr");
     if (e.rank === 1) tr.classList.add("first");
+    if (isMe(e)) tr.classList.add("me");
     if (prev[e.user] !== undefined && prev[e.user] !== e.rank) tr.classList.add("moved");
     ranks[e.user] = e.rank;
-    for (const [text, cls] of [[e.rank], [e.display_name, "name"], [fmtTime(e.time_us)], [fmtMem(e.memory_kib)], [e.attempts]]) {
-      const td = document.createElement("td");
-      td.textContent = text;
-      if (cls) td.className = cls;
-      tr.append(td);
-    }
-    body.append(tr);
-  }
+    const value = kind === "time" ? e.time_us : e.memory_kib;
+    const name = cell(e.display_name, "name"); name.title = e.display_name + " (" + e.user + ")";
+    const lane = cell(undefined, "lane");
+    lane.append(kind === "time" ? speedLane(e, best) : memoryLane(e, worst));
+    tr.append(cell(e.rank, "rank"), name, lane,
+      cell(kind === "time" ? fmtTime(e.time_us) : fmtMem(e.memory_kib), "main"),
+      cell(e.rank === 1 ? "lead" : "+" + (kind === "time" ? fmtTime(value - best) : fmtMem(value - best)), "gap"),
+      cell(kind === "time" ? fmtMem(e.memory_kib) : fmtTime(e.time_us), "other"),
+      cell(e.attempts));
+    return tr;
+  });
   state.previous[key] = ranks;
-  table.append(body);
-  el.replaceChildren(table);
+  table.tBodies[0].replaceChildren(...rows);
+  fitRows(el, rows.length);
+}
+function fitRows(el, n) {
+  if (!matchMedia("(min-width: 900px)").matches) { el.style.removeProperty("--row"); return; }
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const head = el.querySelector("thead")?.offsetHeight ?? 0;
+  const fit = (el.clientHeight - head) / (n + .35);
+  el.style.setProperty("--row", Math.max(1.3 * rem, Math.min(2.6 * rem, fit)) + "px");
+}
+
+function renderYou() {
+  const b = state.boards[state.selected];
+  const q = state.me.trim();
+  $("meClear").hidden = !q;
+  if (!q || !state.ready) { $("youLine").textContent = ""; return; }
+  const t = b?.by_time.find(isMe), m = b?.by_memory.find(isMe);
+  $("youLine").textContent = t ? "You: " + ordinal(t.rank) + " fastest, " + ordinal(m.rank) + " leanest"
+    : "No accepted run for " + q + " here";
+}
+function renderPeople() {
+  const seen = new Map();
+  for (const b of Object.values(state.boards)) for (const e of b.by_time) seen.set(e.user, e.display_name);
+  $("people").replaceChildren(...[...seen].map(([user, name]) => { const o = document.createElement("option"); o.value = user; o.label = name; return o; }));
 }
 
 function render() {
@@ -152,41 +587,142 @@ function render() {
   renderHeader();
   renderNav();
   const b = state.boards[state.selected];
-  renderTable("by_time", b?.by_time);
-  renderTable("by_memory", b?.by_memory);
+  const showNone = state.ready && !state.round;
+  $("none").hidden = !showNone;
+  $("boards").hidden = showNone;
+  document.querySelector(".find").hidden = showNone;
+  $("views").hidden = showNone;
+  if (!showNone) {
+    if (!state.ready) {
+      for (const id of ["by_time", "by_memory"]) { const d = document.createElement("div"); d.className = "empty"; const h = document.createElement("h3"); h.textContent = "Loading results"; d.append(h); $(id).replaceChildren(d); }
+    } else {
+      renderTable("by_time", b?.by_time, "time");
+      renderTable("by_memory", b?.by_memory, "memory");
+    }
+  }
+  $("timeBest").textContent = b?.by_time[0] ? fmtTime(b.by_time[0].time_us) + " = " + fmtHz(b.by_time[0].time_us) : "";
+  $("memBest").textContent = b?.by_memory[0] ? fmtMem(b.by_memory[0].memory_kib) : "";
+  renderPeople();
+  renderYou();
+}
+
+function announce(text) {
+  const t = $("ticker"), when = document.createElement("time");
+  when.textContent = clockText(new Date());
+  t.replaceChildren(when, text);
+  t.classList.remove("fresh"); void t.offsetWidth; t.classList.add("fresh");
+}
+function watchLeads(old, next) {
+  if (!old) return;
+  const title = titleOf(next.problem);
+  const a = next.by_time[0], b = next.by_memory[0];
+  if (a && a.user !== old.by_time[0]?.user) announce(a.display_name + " is now fastest on " + title + " at " + fmtTime(a.time_us));
+  else if (a && a.time_us < old.by_time[0].time_us) announce(a.display_name + " improved fastest on " + title + " to " + fmtTime(a.time_us));
+  else if (b && b.user !== old.by_memory[0]?.user) announce(b.display_name + " is now leanest on " + title + " at " + fmtMem(b.memory_kib));
+  else if (b && b.memory_kib < old.by_memory[0].memory_kib) announce(b.display_name + " improved leanest on " + title + " to " + fmtMem(b.memory_kib));
 }
 
 function handle(event) {
   switch (event.type) {
+    case "hello": state.ready = true; break;
     case "round":
       if (state.round?.id !== event.round.id) { state.boards = {}; state.previous = {}; }
       state.round = event.round;
       state.offset = event.round.server_time - Math.floor(Date.now() / 1000);
       break;
     case "board":
+      watchLeads(state.boards[event.board.problem], event.board);
       state.boards[event.board.problem] = event.board;
       break;
     default:
       return;
   }
+  state.lastData = new Date();
   render();
 }
 
-function connect() {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(proto + "//" + location.host + "/ws");
-  ws.onopen = () => { $("status").textContent = "live"; };
-  ws.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch (e) { console.error(e); } };
-  ws.onclose = () => { $("status").textContent = "reconnecting…"; setTimeout(connect, 2000); };
+let socket = null, retryTimer = null;
+function setLink(mode, text) {
+  $("link").className = mode;
+  $("linkText").textContent = text;
 }
+function connect() {
+  clearTimeout(retryTimer);
+  if (socket && socket.readyState <= 1) return;
+  setLink("", state.lastData ? "Reconnecting" : "Connecting");
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = socket = new WebSocket(proto + "//" + location.host + "/ws");
+  ws.onopen = () => {
+    state.connected = true;
+    $("notice").hidden = true;
+    setLink("live", "Live");
+  };
+  ws.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch (e) { console.error(e); } };
+  ws.onclose = () => {
+    state.connected = false;
+    setLink("down", "Offline");
+    $("noticeText").textContent = "Connection lost. " + (state.lastData ? "Showing results from " + clockText(state.lastData) + ". " : "") + "Retrying every 2 seconds.";
+    $("notice").hidden = false;
+    retryTimer = setTimeout(connect, 2000);
+  };
+}
+
+$("prev").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("rotate").onclick = () => setPinned(!state.pinned);
+$("retry").onclick = connect;
+$("helpBtn").onclick = () => $("help").showModal();
+function toggleFull() {
+  if (document.fullscreenElement) document.exitFullscreen?.();
+  else document.documentElement.requestFullscreen?.().catch(() => {});
+}
+$("fullBtn").onclick = toggleFull;
+document.addEventListener("fullscreenchange", () => { $("fullBtn").textContent = document.fullscreenElement ? "Exit fullscreen" : "Fullscreen"; });
+for (const b of document.querySelectorAll("#views button")) b.onclick = () => {
+  $("boards").dataset.view = b.dataset.view;
+  for (const o of document.querySelectorAll("#views button")) o.setAttribute("aria-pressed", String(o === b));
+};
+function setMe(v) { state.me = v; store.set("arena.me", v.trim()); render(); }
+$("me").addEventListener("input", (e) => setMe(e.target.value));
+$("meClear").onclick = () => { $("me").value = ""; setMe(""); $("me").focus(); };
+
+addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || $("help").open) return;
+  if (e.target.matches("input")) { if (e.key === "Escape") e.target.blur(); return; }
+  const onControl = e.target.matches("button, a");
+  if (e.key === "ArrowLeft") step(-1);
+  else if (e.key === "ArrowRight") step(1);
+  else if (e.key === " " && !onControl) setPinned(!state.pinned);
+  else if (e.key === "/") $("me").focus();
+  else if (e.key === "?") $("help").showModal();
+  else if (e.key === "f" || e.key === "F") toggleFull();
+  else if (/^[1-9]$/.test(e.key)) { const slug = problems()[+e.key - 1]; if (slug) select(slug, true); else return; }
+  else return;
+  e.preventDefault();
+});
+addEventListener("resize", () => { for (const id of ["by_time", "by_memory"]) fitRows($(id), $(id).querySelectorAll("tbody tr").length); });
 
 setInterval(renderHeader, 1000);
 setInterval(() => {
   const list = problems();
   if (state.pinned || list.length < 2) return;
-  state.selected = list[(list.indexOf(state.selected) + 1) % list.length];
-  render();
-}, 20000);
+  state.rotateLeft -= 1;
+  if (state.rotateLeft <= 0) { select(list[(list.indexOf(state.selected) + 1) % list.length], false); return; }
+  renderRotate();
+}, 1000);
+setInterval(() => {
+  if (state.pinned || !matchMedia("(min-width: 900px)").matches) return;
+  for (const id of ["by_time", "by_memory"]) {
+    const el = $(id);
+    if (el.scrollHeight <= el.clientHeight + 2) continue;
+    el.scrollTop = el.scrollTop + el.clientHeight >= el.scrollHeight - 2 ? 0 : el.scrollTop + el.clientHeight - 40;
+  }
+}, 5000);
+
+state.me = store.get("arena.me");
+$("me").value = state.me;
+const wanted = decodeURIComponent(location.hash.slice(1));
+if (wanted) { state.selected = wanted; state.pinned = true; }
 fetch("/api/info").then((r) => r.json()).then((i) => { $("source").href = i.source_url; }).catch(() => {});
 render();
 connect();
