@@ -58,6 +58,8 @@ svg.i { width: 1em; height: 1em; fill: currentColor; shape-rendering: crispEdges
 .btn.primary:hover { background: var(--white); color: var(--ink); }
 .btn.primary:disabled { background: var(--cyan); color: var(--ink); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.motion { padding: 0; border: 0; background: none; color: var(--ice); text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: var(--px); }
+.motion:hover { color: var(--white); }
 html { scrollbar-color: var(--blue) var(--ink); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
@@ -117,7 +119,6 @@ ol p { color: var(--ice); }
   .pitch { gap: .5rem; }
   .pitch img { width: 243px; }
   .pitch p { font-size: 1.15rem; }
-  .pitch a { display: none; }
   main { padding: .9rem .9rem 1rem; }
 }
 </style>
@@ -128,6 +129,8 @@ ol p { color: var(--ice); }
   <img src="data:image/png;base64,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" width="486" height="192" alt="Runtime Arena">
   <p>Write it in any language. Submit it from your terminal. Climb the board on speed and memory.</p>
   <a href="/">Watch the live leaderboard</a>
+  <a href="/help">Read the participant guide</a>
+  <button class="motion" id="motionBtn">Pause background</button>
 </div>
 <main class="plate">
   <form id="form" novalidate>
@@ -186,42 +189,108 @@ ol p { color: var(--ice); }
       <li>
         <h2>Check the round and submit</h2>
         <div class="cmd"><pre id="submitCmd" tabindex="0">arena round
-arena submit &lt;problem&gt; ./solution</pre><button type="button" data-copy="submitCmd">Copy</button></div>
+arena submit &lt;problem&gt; ./solution --src ./solution.c</pre><button type="button" data-copy="submitCmd">Copy</button></div>
       </li>
     </ol>
     <a class="btn primary cta" href="/">Open the leaderboard</a>
+    <p class="have"><a href="/help">Read the participant guide</a> for languages, verdicts and every command.</p>
   </section>
 </main>
 <script>
 "use strict";
-function paintBackground() {
+const liquid = (() => {
   const canvas = document.getElementById("paint");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const cell = Math.max(3, Math.ceil(innerWidth / 640));
-  const w = canvas.width = Math.ceil(innerWidth / cell);
-  const h = canvas.height = Math.ceil(innerHeight / cell);
-  const image = ctx.createImageData(w, h);
-  const ramp = [[4, 8, 24], [8, 18, 51], [8, 18, 51], [13, 29, 79], [13, 29, 79], [19, 48, 128]];
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const button = document.getElementById("motionBtn");
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  const SINE_SIZE = 4096, SINE_STEP = SINE_SIZE / (Math.PI * 2);
+  const sine = new Float32Array(SINE_SIZE);
+  for (let i = 0; i < SINE_SIZE; i++) sine[i] = Math.sin(i / SINE_STEP);
+  const wave = (x) => sine[(x * SINE_STEP | 0) & (SINE_SIZE - 1)];
+  const ramp = new Uint32Array([[4, 8, 24], [8, 18, 51], [8, 18, 51], [13, 29, 79], [13, 29, 79], [19, 48, 128]]
+    .map(([r, g, b]) => (255 << 24 | b << 16 | g << 8 | r) >>> 0));
   const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-  const scale = Math.min(w, h) * .72;
-  for (let y = 0, i = 0; y < h; y++) {
-    for (let x = 0; x < w; x++, i += 4) {
-      const u = (x - w / 2) / scale, v = (y - h / 2) / scale;
-      const r = Math.hypot(u, v), a = Math.atan2(v, u);
-      const phase = 11.4 * r ** 1.55 + 3 * a + 1.6 * Math.sin(2.4 * r - 2 * a) + .6 * Math.sin(5 * u + 3 * v);
-      const fade = Math.max(.2, Math.min(1, 1.08 - .34 * r));
-      const core = Math.min(1, r / .2);
-      const value = (Math.sin(phase) + 1) / 2 * fade * core + (bayer[(y % 4) * 4 + x % 4] / 16 - .47) * .2;
-      const c = ramp[Math.max(0, Math.min(ramp.length - 1, Math.floor(value * ramp.length)))];
-      image.data[i] = c[0]; image.data[i + 1] = c[1]; image.data[i + 2] = c[2]; image.data[i + 3] = 255;
+  let field = null, clock = 0, last = 0, wait = 83, frame = 0;
+
+  function saved() { try { return localStorage.getItem("arena.motion"); } catch { return null; } }
+  function save(v) { try { localStorage.setItem("arena.motion", v); } catch {} }
+  let moving = saved() ? saved() === "on" : !calm.matches;
+
+  function build() {
+    const cell = Math.max(3, Math.ceil(innerWidth / 640));
+    const w = canvas.width = Math.ceil(innerWidth / cell);
+    const h = canvas.height = Math.ceil(innerHeight / cell);
+    const n = w * h, scale = Math.min(w, h) * .72;
+    const f = { n, image: ctx.createImageData(w, h), spiral: new Float32Array(n), swirl: new Float32Array(n), cross: new Float32Array(n),
+      across: new Float32Array(n), down: new Float32Array(n), gain: new Float32Array(n), grain: new Float32Array(n) };
+    f.pixels = new Uint32Array(f.image.data.buffer);
+    for (let y = 0, i = 0; y < h; y++) {
+      for (let x = 0; x < w; x++, i++) {
+        const u = (x - w / 2) / scale, v = (y - h / 2) / scale;
+        const r = Math.hypot(u, v), a = Math.atan2(v, u);
+        f.spiral[i] = 11.4 * r ** 1.55 + 3 * a;
+        f.swirl[i] = 2.4 * r - 2 * a;
+        f.cross[i] = 5 * u + 3 * v;
+        f.across[i] = 3.4 * u;
+        f.down[i] = 3.8 * v;
+        f.gain[i] = Math.max(.2, Math.min(1, 1.08 - .34 * r)) * Math.min(1, r / .2);
+        f.grain[i] = (bayer[(y % 4) * 4 + x % 4] / 16 - .47) * .2;
+      }
     }
+    field = f;
   }
-  ctx.putImageData(image, 0, 0);
-}
-paintBackground();
-let paintTimer;
-addEventListener("resize", () => { clearTimeout(paintTimer); paintTimer = setTimeout(paintBackground, 150); });
+
+  function draw(t) {
+    const { n, spiral, swirl, cross, across, down, gain, grain, pixels, image } = field;
+    const flow = t * .34, a = t * .27, b = t * .19, c = t * .31, d = t * .23;
+    for (let i = 0; i < n; i++) {
+      const phase = spiral[i] - flow + 1.6 * wave(swirl[i] + a) + .6 * wave(cross[i] - b) + .5 * wave(down[i] + c) + .5 * wave(across[i] - d);
+      const level = ((wave(phase) + 1) * .5 * gain[i] + grain[i]) * 6 | 0;
+      pixels[i] = ramp[level < 0 ? 0 : level > 5 ? 5 : level];
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+
+  function tick(now) {
+    frame = 0;
+    if (!moving) return;
+    frame = requestAnimationFrame(tick);
+    const gap = now - last;
+    if (gap < wait) return;
+    last = now;
+    clock += Math.min(gap, 250) / 1000;
+    const start = performance.now();
+    draw(clock);
+    wait = Math.max(83, (performance.now() - start) * 8);
+  }
+
+  function label() {
+    if (!button) return;
+    button.textContent = moving ? "Pause background" : "Play background";
+    button.setAttribute("aria-pressed", String(!moving));
+  }
+  function setMoving(on) {
+    moving = on;
+    label();
+    if (on && !frame) { last = performance.now(); frame = requestAnimationFrame(tick); }
+  }
+
+  build();
+  draw(clock);
+  label();
+  setMoving(moving);
+  if (button) button.onclick = () => { save(moving ? "off" : "on"); setMoving(!moving); };
+  calm.addEventListener("change", () => { if (!saved()) setMoving(!calm.matches); });
+  addEventListener("keydown", (e) => {
+    if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.matches("input")) {
+      save(moving ? "off" : "on");
+      setMoving(!moving);
+    }
+  });
+  let resizeTimer;
+  addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { build(); draw(clock); }, 150); });
+  return { isMoving: () => moving, cost() { const s = performance.now(); for (let i = 0; i < 20; i++) draw(clock); return (performance.now() - s) / 20; } };
+})();
 
 const $ = (id) => document.getElementById(id);
 const INSTALL = {

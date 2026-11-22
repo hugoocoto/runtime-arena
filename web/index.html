@@ -58,6 +58,8 @@ svg.i { width: 1em; height: 1em; fill: currentColor; shape-rendering: crispEdges
 .btn.primary:hover { background: var(--white); color: var(--ink); }
 .btn.primary:disabled { background: var(--cyan); color: var(--ink); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.motion { padding: 0; border: 0; background: none; color: var(--ice); text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: var(--px); }
+.motion:hover { color: var(--white); }
 html { scrollbar-color: var(--blue) var(--ink); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
@@ -247,6 +249,7 @@ dialog form { position: absolute; top: .9rem; right: 1rem; }
     <datalist id="people"></datalist>
     <button id="meClear" aria-label="Clear name" title="Clear name" hidden><svg class="i" viewBox="0 0 8 8"><path d="M1 1h2v1h2V1h2v2H6v2h1v2H5V6H3v1H1V5h1V3H1z"/></svg></button>
   </div>
+  <a class="btn" id="guideLink" href="/help"><svg class="i" viewBox="0 0 8 8" aria-hidden="true"><path d="M2 0h4v1h1v3H6v1H5v1H3V4h1V3h1V1H3v2H2V1h0zM3 7h2v1H3z"/></svg>Help</a>
   <div id="views" role="group" aria-label="Choose leaderboard">
     <button class="btn" data-view="time" aria-pressed="true">Fastest</button>
     <button class="btn" data-view="memory" aria-pressed="false">Leanest</button>
@@ -278,13 +281,14 @@ dialog form { position: absolute; top: .9rem; right: 1rem; }
   <span id="youLine" role="status"></span>
   <span id="link"><span id="dot"></span><span id="linkText">Connecting</span></span>
   <a href="/join">Join</a>
-  <button class="linkbtn" id="helpBtn">Help <span class="key">?</span></button>
+  <button class="linkbtn" id="helpBtn">Shortcuts <span class="key">?</span></button>
   <button class="linkbtn" id="fullBtn">Fullscreen</button>
+  <button class="motion" id="motionBtn">Pause background</button>
   <a id="source" href="https://github.com/hugoocoto/runtime-arena">Source (AGPL-3.0)</a>
 </footer>
 
 <dialog id="help" class="plate" aria-labelledby="helpTitle">
-  <h2 id="helpTitle">How this board works</h2>
+  <h2 id="helpTitle">Board shortcuts and ranking</h2>
   <form method="dialog"><button class="btn icon" aria-label="Close help" title="Close (Esc)"><svg class="i" viewBox="0 0 8 8"><path d="M1 1h2v1h2V1h2v2H6v2h1v2H5V6H3v1H1V5h1V3H1z"/></svg></button></form>
   <h3>Ranking</h3>
   <ul>
@@ -295,6 +299,7 @@ dialog form { position: absolute; top: .9rem; right: 1rem; }
   </ul>
   <h3>Reading the signal</h3>
   <p>On Fastest, more pulses means a faster run: half the speed of the leader draws half the pulses. Hz is one divided by the CPU time. On Leanest, fewer lit blocks means less memory.</p>
+  <p style="margin-top:.7rem"><a href="/help">Open the participant guide</a> to learn how to submit and use the CLI.</p>
   <h3>Keyboard</h3>
   <div class="keys">
     <div><span class="key">Left</span><span class="key">Right</span> change problem</div>
@@ -302,40 +307,106 @@ dialog form { position: absolute; top: .9rem; right: 1rem; }
     <div><span class="key">Space</span> pause or resume rotation</div>
     <div><span class="key">/</span> find your name</div>
     <div><span class="key">F</span> fullscreen</div>
+    <div><span class="key">M</span> pause or play the background</div>
     <div><span class="key">?</span> open this help</div>
   </div>
 </dialog>
 
 <script>
 "use strict";
-function paintBackground() {
+const liquid = (() => {
   const canvas = document.getElementById("paint");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const cell = Math.max(3, Math.ceil(innerWidth / 640));
-  const w = canvas.width = Math.ceil(innerWidth / cell);
-  const h = canvas.height = Math.ceil(innerHeight / cell);
-  const image = ctx.createImageData(w, h);
-  const ramp = [[4, 8, 24], [8, 18, 51], [8, 18, 51], [13, 29, 79], [13, 29, 79], [19, 48, 128]];
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const button = document.getElementById("motionBtn");
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  const SINE_SIZE = 4096, SINE_STEP = SINE_SIZE / (Math.PI * 2);
+  const sine = new Float32Array(SINE_SIZE);
+  for (let i = 0; i < SINE_SIZE; i++) sine[i] = Math.sin(i / SINE_STEP);
+  const wave = (x) => sine[(x * SINE_STEP | 0) & (SINE_SIZE - 1)];
+  const ramp = new Uint32Array([[4, 8, 24], [8, 18, 51], [8, 18, 51], [13, 29, 79], [13, 29, 79], [19, 48, 128]]
+    .map(([r, g, b]) => (255 << 24 | b << 16 | g << 8 | r) >>> 0));
   const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-  const scale = Math.min(w, h) * .72;
-  for (let y = 0, i = 0; y < h; y++) {
-    for (let x = 0; x < w; x++, i += 4) {
-      const u = (x - w / 2) / scale, v = (y - h / 2) / scale;
-      const r = Math.hypot(u, v), a = Math.atan2(v, u);
-      const phase = 11.4 * r ** 1.55 + 3 * a + 1.6 * Math.sin(2.4 * r - 2 * a) + .6 * Math.sin(5 * u + 3 * v);
-      const fade = Math.max(.2, Math.min(1, 1.08 - .34 * r));
-      const core = Math.min(1, r / .2);
-      const value = (Math.sin(phase) + 1) / 2 * fade * core + (bayer[(y % 4) * 4 + x % 4] / 16 - .47) * .2;
-      const c = ramp[Math.max(0, Math.min(ramp.length - 1, Math.floor(value * ramp.length)))];
-      image.data[i] = c[0]; image.data[i + 1] = c[1]; image.data[i + 2] = c[2]; image.data[i + 3] = 255;
+  let field = null, clock = 0, last = 0, wait = 83, frame = 0;
+
+  function saved() { try { return localStorage.getItem("arena.motion"); } catch { return null; } }
+  function save(v) { try { localStorage.setItem("arena.motion", v); } catch {} }
+  let moving = saved() ? saved() === "on" : !calm.matches;
+
+  function build() {
+    const cell = Math.max(3, Math.ceil(innerWidth / 640));
+    const w = canvas.width = Math.ceil(innerWidth / cell);
+    const h = canvas.height = Math.ceil(innerHeight / cell);
+    const n = w * h, scale = Math.min(w, h) * .72;
+    const f = { n, image: ctx.createImageData(w, h), spiral: new Float32Array(n), swirl: new Float32Array(n), cross: new Float32Array(n),
+      across: new Float32Array(n), down: new Float32Array(n), gain: new Float32Array(n), grain: new Float32Array(n) };
+    f.pixels = new Uint32Array(f.image.data.buffer);
+    for (let y = 0, i = 0; y < h; y++) {
+      for (let x = 0; x < w; x++, i++) {
+        const u = (x - w / 2) / scale, v = (y - h / 2) / scale;
+        const r = Math.hypot(u, v), a = Math.atan2(v, u);
+        f.spiral[i] = 11.4 * r ** 1.55 + 3 * a;
+        f.swirl[i] = 2.4 * r - 2 * a;
+        f.cross[i] = 5 * u + 3 * v;
+        f.across[i] = 3.4 * u;
+        f.down[i] = 3.8 * v;
+        f.gain[i] = Math.max(.2, Math.min(1, 1.08 - .34 * r)) * Math.min(1, r / .2);
+        f.grain[i] = (bayer[(y % 4) * 4 + x % 4] / 16 - .47) * .2;
+      }
     }
+    field = f;
   }
-  ctx.putImageData(image, 0, 0);
-}
-paintBackground();
-let paintTimer;
-addEventListener("resize", () => { clearTimeout(paintTimer); paintTimer = setTimeout(paintBackground, 150); });
+
+  function draw(t) {
+    const { n, spiral, swirl, cross, across, down, gain, grain, pixels, image } = field;
+    const flow = t * .34, a = t * .27, b = t * .19, c = t * .31, d = t * .23;
+    for (let i = 0; i < n; i++) {
+      const phase = spiral[i] - flow + 1.6 * wave(swirl[i] + a) + .6 * wave(cross[i] - b) + .5 * wave(down[i] + c) + .5 * wave(across[i] - d);
+      const level = ((wave(phase) + 1) * .5 * gain[i] + grain[i]) * 6 | 0;
+      pixels[i] = ramp[level < 0 ? 0 : level > 5 ? 5 : level];
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+
+  function tick(now) {
+    frame = 0;
+    if (!moving) return;
+    frame = requestAnimationFrame(tick);
+    const gap = now - last;
+    if (gap < wait) return;
+    last = now;
+    clock += Math.min(gap, 250) / 1000;
+    const start = performance.now();
+    draw(clock);
+    wait = Math.max(83, (performance.now() - start) * 8);
+  }
+
+  function label() {
+    if (!button) return;
+    button.textContent = moving ? "Pause background" : "Play background";
+    button.setAttribute("aria-pressed", String(!moving));
+  }
+  function setMoving(on) {
+    moving = on;
+    label();
+    if (on && !frame) { last = performance.now(); frame = requestAnimationFrame(tick); }
+  }
+
+  build();
+  draw(clock);
+  label();
+  setMoving(moving);
+  if (button) button.onclick = () => { save(moving ? "off" : "on"); setMoving(!moving); };
+  calm.addEventListener("change", () => { if (!saved()) setMoving(!calm.matches); });
+  addEventListener("keydown", (e) => {
+    if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.matches("input")) {
+      save(moving ? "off" : "on");
+      setMoving(!moving);
+    }
+  });
+  let resizeTimer;
+  addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { build(); draw(clock); }, 150); });
+  return { isMoving: () => moving, cost() { const s = performance.now(); for (let i = 0; i < 20; i++) draw(clock); return (performance.now() - s) / 20; } };
+})();
 
 const ROTATE_SECONDS = 20;
 const state = { ready: false, connected: false, round: null, boards: {}, selected: null, pinned: false, previous: {},
@@ -514,7 +585,7 @@ function renderEmpty(el, kind) {
   else {
     h.textContent = kind === "time" ? "No fastest run yet" : "No leanest run yet";
     p.textContent = "The first accepted solution takes this spot. Submit yours:";
-    const c = document.createElement("code"); c.textContent = "arena submit " + (slug ?? "<problem>") + " ./solution";
+    const c = document.createElement("code"); c.textContent = "arena submit " + (slug ?? "<problem>") + " ./solution --src ./solution.c";
     box.append(h, p, c);
   }
   el.replaceChildren(box);

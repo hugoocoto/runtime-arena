@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#040818">
+<title>Participant guide | Runtime Arena</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABk0lEQVR42u2aMW7DMAxFPXTIkqVdigK5QKYCPYiv1KmX6HF6gV4ja/bAhQYWDCOZ/JTtiIEMfBiRTfk/fcWOHQ8DW552r1MEDbklbRh/phC6gSDzx69l9Db+utcWXUGg5tcyheofomb0yaQHjuSFVAFqzK058q4E1p7TiwBsGf9mCbQ48lUJtKRsAuj08VxFeR/o/uYELEp158sEi0xZ60sQcALS/P4wugGQejMAMvLp4DUASD2cgGZ+9/xRBYDWL5qABkDtXFaAUk0HQADSNhIKUGrfFIDOMB2gA3SAIADfp+lKOQC5T2lbqV0CvLx/xgYImwCN/EMkkCB6AvdIgEOYAHK3ePcA4DInkNrlwTVZAOZkqSGIWQC6a/I8NZYASL2lRgXgt3zhAGoO3iQAIv64xNOHpYbMLw7Azw6ePiw13LwKgEiep9E++LSb24ebV7/EiOQVkiCQeq1Gmod/SpC53BVRW5Pk51rdALRgqgpgbuQ9680BWjBVnUCU6aMmEEFwAs0C8H/rw43+w7zsEfl1mz9mn84nB/BaeAAAAABJRU5ErkJggg==">
+<style>
+@font-face{font-family:"Jersey 10";font-display:swap;src:url(data:font/woff2;base64,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) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1E00-1E9F,U+1EF2-1EFF,U+20A0-20AB,U+20AD-20C4}
+@font-face{font-family:"Jersey 10";font-display:swap;src:url(data:font/woff2;base64,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) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+FEFF,U+FFFD}
+:root {
+  color-scheme: dark;
+  --ink: #040818; --navy: #081233; --deep: #0d1d4f; --mid: #133080;
+  --blue: #1a4fd0; --bright: #2a86ff; --cyan: #4fc3ff; --ice: #9be9ff; --white: #f2fdff;
+  --px: max(2px, .12rem);
+  --pixel: "Jersey 10", ui-monospace, "DejaVu Sans Mono", monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--ink); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; color: var(--white); background: transparent;
+  font: 400 1rem/1.3 var(--pixel); letter-spacing: .02em;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: none; font-smooth: never;
+}
+#paint { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; image-rendering: pixelated; }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, rgb(4 8 24 / .28) 3px 4px);
+}
+::selection { background: var(--ice); color: var(--ink); }
+:focus-visible { outline: var(--px) solid var(--white); outline-offset: var(--px); }
+a { color: var(--ice); text-underline-offset: .18em; text-decoration-thickness: var(--px); }
+a:hover { color: var(--white); }
+h1, h2, h3, p { margin: 0; }
+code, pre { font-family: var(--pixel); }
+button, input { font: inherit; letter-spacing: inherit; color: inherit; }
+button { cursor: pointer; }
+svg.i { width: 1em; height: 1em; fill: currentColor; shape-rendering: crispEdges; flex: none; display: block; }
+.plate {
+  background: var(--navy);
+  box-shadow: 0 calc(var(--px) * -1) var(--mid), 0 var(--px) var(--mid), calc(var(--px) * -1) 0 var(--mid), var(--px) 0 var(--mid);
+}
+.key {
+  display: inline-block; min-width: 1.4em; padding: 0 .3em; text-align: center; color: var(--ink);
+  background: var(--ice); line-height: 1.2;
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4em; min-height: 2.2rem; padding: 0 .7em;
+  background: var(--deep); border: 0; color: var(--ice); text-decoration: none;
+  box-shadow: inset 0 var(--px) var(--blue), inset 0 calc(var(--px) * -1) var(--ink);
+}
+.btn:hover { background: var(--mid); color: var(--white); }
+.btn:active { transform: translateY(var(--px)); box-shadow: inset 0 var(--px) var(--ink); }
+.btn:disabled { color: var(--cyan); background: var(--navy); cursor: progress; }
+.btn.primary { background: var(--ice); color: var(--ink); box-shadow: inset 0 var(--px) var(--white), inset 0 calc(var(--px) * -1) var(--bright); }
+.btn.primary:hover { background: var(--white); color: var(--ink); }
+.btn.primary:disabled { background: var(--cyan); color: var(--ink); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.motion { padding: 0; border: 0; background: none; color: var(--ice); text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: var(--px); }
+.motion:hover { color: var(--white); }
+html { scrollbar-color: var(--blue) var(--ink); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+html { font-size: clamp(20px, 1.2vw, 28px); scroll-behavior: smooth; scroll-padding-top: 1rem; }
+body { line-height: 1.4; }
+.page { display: grid; grid-template-columns: 15rem minmax(0, 46rem); justify-content: center; gap: 2.2rem;
+  padding: max(1.1rem, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.rail { position: sticky; top: 1.1rem; align-self: start; display: grid; gap: .9rem; max-height: calc(100dvh - 2.2rem); overflow: auto; }
+.rail img { display: block; width: 162px; height: 64px; image-rendering: pixelated; }
+.rail nav { display: grid; padding: .35rem; }
+.rail nav a { display: flex; gap: .45em; padding: .08rem .45rem; color: var(--ice); text-decoration: none; }
+.rail nav a b { width: 1em; font-weight: 400; color: var(--cyan); }
+.rail nav a:hover { background: var(--mid); color: var(--white); }
+.rail nav a[aria-current="true"] { background: var(--ice); color: var(--ink); }
+.rail nav a[aria-current="true"] b { color: var(--blue); }
+.rail nav hr { width: 100%; height: var(--px); border: 0; margin: .3rem 0; background: var(--mid); }
+.exits { display: flex; flex-wrap: wrap; gap: .25rem; }
+.exits .btn { flex: 1; white-space: nowrap; }
+main { display: grid; gap: 1.2rem; min-width: 0; }
+.intro { padding: .3rem 0 .2rem; }
+h1 { font-size: clamp(2.6rem, 5vw, 4rem); line-height: .95; font-weight: 400; text-shadow: .04em .04em 0 var(--blue); text-wrap: balance; }
+.intro p { margin-top: .5rem; max-width: 34em; font-size: 1.25rem; line-height: 1.3; color: var(--ice); }
+.wave { display: block; width: 100%; height: 1.1rem; margin-top: .8rem; shape-rendering: crispEdges; }
+.wave path { fill: none; stroke: var(--ice); stroke-width: 2; vector-effect: non-scaling-stroke; }
+section { padding: 1rem 1.2rem 1.15rem; display: grid; gap: .55rem; min-width: 0; }
+h2 { display: flex; align-items: center; gap: .45em; font-size: 1.9rem; line-height: 1; font-weight: 400; text-wrap: balance; }
+h2 b { display: grid; place-items: center; flex: none; width: 1.15em; height: 1.15em; font-weight: 400; background: var(--ice); color: var(--ink); font-size: .85em; }
+h3 { margin-top: .35rem; font-size: 1.3rem; line-height: 1.1; font-weight: 400; color: var(--ice); }
+p, li { max-width: 42rem; }
+p { color: var(--white); }
+.note { color: var(--ice); }
+ul { margin: 0; padding-left: 1.1em; }
+code { color: var(--white); background: var(--deep); padding: 0 .28em; overflow-wrap: anywhere; }
+pre code { background: none; padding: 0; }
+.cmd { display: flex; align-items: stretch; background: var(--ink); box-shadow: inset 0 0 0 var(--px) var(--mid); min-width: 0; }
+.cmd pre { flex: 1; min-width: 0; margin: 0; padding: .4rem .6rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--white); line-height: 1.25; }
+.cmd .dim { color: var(--cyan); }
+.cmd button { flex: none; min-width: 4.2em; border: 0; background: var(--deep); color: var(--ice); padding: 0 .5em; }
+.cmd button:hover { background: var(--mid); color: var(--white); }
+.tabs { display: flex; flex-wrap: wrap; gap: .2rem; }
+.tabs button { border: 0; min-height: 1.8rem; padding: 0 .65em; background: var(--deep); color: var(--ice); }
+.tabs button:hover { background: var(--mid); color: var(--white); }
+.tabs button[aria-pressed="true"] { background: var(--ice); color: var(--ink); }
+.panel { display: grid; gap: .45rem; }
+.table { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; color: var(--cyan); font-weight: 400; padding: .1rem .5rem; box-shadow: inset 0 calc(var(--px) * -1) var(--mid); white-space: nowrap; }
+td { padding: .22rem .5rem; vertical-align: top; color: var(--ice); box-shadow: inset 0 -1px var(--deep); }
+td:first-child { color: var(--white); white-space: nowrap; }
+td code { background: none; padding: 0; color: var(--white); }
+.verdict { display: inline-block; padding: 0 .35em; background: var(--deep); color: var(--white); }
+.verdict.ok { background: var(--ice); color: var(--ink); }
+.search { display: flex; background: var(--ink); box-shadow: inset 0 0 0 var(--px) var(--mid); }
+.search:focus-within { box-shadow: inset 0 0 0 var(--px) var(--white); }
+.search label { align-self: center; padding-left: .55em; color: var(--ice); white-space: nowrap; }
+.search input { flex: 1; min-width: 0; min-height: 2.1rem; padding: 0 .5em; background: none; border: 0; outline: 0; caret-color: var(--ice); }
+.search input::placeholder { color: var(--cyan); opacity: 1; }
+#noCommands { color: var(--ice); }
+dl { margin: 0; display: grid; gap: .55rem; }
+dt { color: var(--white); }
+dt code { background: var(--deep); }
+dd { margin: .05rem 0 0; color: var(--ice); max-width: 42rem; }
+footer { color: var(--ice); }
+@media (max-width: 960px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: .9rem; }
+  .rail { position: static; max-height: none; overflow: visible; }
+  .rail nav { display: flex; gap: .15rem; overflow-x: auto; padding: .25rem; }
+  .rail nav a { flex: none; }
+  .rail nav hr { display: none; }
+  section { padding: .85rem .85rem 1rem; }
+  td:first-child { white-space: normal; }
+}
+</style>
+</head>
+<body>
+<canvas id="paint" aria-hidden="true"></canvas>
+<div class="page">
+  <aside class="rail">
+    <a href="/" aria-label="Runtime Arena leaderboard"><img src="data:image/png;base64,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" width="162" height="64" alt="Runtime Arena"></a>
+    <nav class="plate" id="toc" aria-label="On this page">
+      <a href="#install"><b>1</b>Install</a>
+      <a href="#account"><b>2</b>Create account</a>
+      <a href="#read"><b>3</b>Read the problem</a>
+      <a href="#build"><b>4</b>Write and build</a>
+      <a href="#submit"><b>5</b>Submit</a>
+      <a href="#board"><b>6</b>Watch the board</a>
+      <hr>
+      <a href="#verdicts">Verdicts</a>
+      <a href="#ranking">Ranking</a>
+      <a href="#commands">All commands</a>
+      <a href="#problems">Fix a problem</a>
+    </nav>
+    <div class="exits"><a class="btn" href="/">Leaderboard</a><a class="btn" href="/join">Join</a></div>
+  </aside>
+
+  <main>
+    <div class="intro">
+      <h1>From zero to the leaderboard</h1>
+      <p>Follow these six steps for your first submission. Code in any editor and any language, then send the result with the arena command.</p>
+      <svg class="wave" viewBox="0 0 1000 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 18H90V2H240V18H370V2H480V18H575V2H655V18H725V2H780V18H830V2H870V18H905V2H935V18H960V2H980V18H1000"/></svg>
+    </div>
+
+    <section class="plate" id="install">
+      <h2><b>1</b>Install arena</h2>
+      <div class="tabs" role="group" aria-label="Operating system">
+        <button data-group="os" data-value="unix" aria-pressed="true">Linux or macOS</button>
+        <button data-group="os" data-value="windows" aria-pressed="false">Windows</button>
+      </div>
+      <div class="panel" data-for="os" data-value="unix"><pre class="c">curl -fsSL https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.sh | sh
+arena --version</pre></div>
+      <div class="panel" data-for="os" data-value="windows" hidden><pre class="c">irm https://raw.githubusercontent.com/hugoocoto/runtime-arena/main/install.ps1 | iex
+arena --version</pre></div>
+      <p class="note">The installer checks the download against the release checksums. You can also get an archive from the <a href="https://github.com/hugoocoto/runtime-arena/releases/latest">releases page</a>.</p>
+    </section>
+
+    <section class="plate" id="account">
+      <h2><b>2</b>Create your account</h2>
+      <p>You need the event code from the organiser. Sign up in your terminal, or use the <a href="/join">join page</a> and then log in.</p>
+      <pre class="c">arena signup https://&lt;domain&gt;</pre>
+      <h3>Signed up on the join page, or on another computer?</h3>
+      <pre class="c">arena login https://&lt;domain&gt;</pre>
+      <div id="trustBlock">
+        <h3>Certificate error on a LAN event?</h3>
+        <p>Trust the event's certificate once. Compare the fingerprint it shows with the one from the organiser, then run signup or login again.</p>
+        <pre class="c">arena trust https://&lt;domain&gt;</pre>
+      </div>
+      <p class="note">arena remembers the server and your login, so later commands need no address. It keeps a token for this device and sends your password only when you log in.</p>
+    </section>
+
+    <section class="plate" id="read">
+      <h2><b>3</b>Read the problem</h2>
+      <p>List the round, then open a problem by its short name. This example uses a problem called <code>sum</code>.</p>
+      <pre class="c">arena round
+arena problem sum --samples samples</pre>
+      <p class="note"><code>--samples samples</code> saves each sample as <code>NAME.in</code> and <code>NAME.out</code> in a folder called samples, so you can test before you submit.</p>
+    </section>
+
+    <section class="plate" id="build">
+      <h2><b>4</b>Write and build</h2>
+      <p>The judge runs a Linux x86-64 executable or a script that starts with <code>#!</code>. Pick your language.</p>
+      <div class="tabs" role="group" aria-label="Language">
+        <button data-group="lang" data-value="python" aria-pressed="true">Python</button>
+        <button data-group="lang" data-value="c" aria-pressed="false">C</button>
+        <button data-group="lang" data-value="cpp" aria-pressed="false">C++</button>
+        <button data-group="lang" data-value="rust" aria-pressed="false">Rust</button>
+        <button data-group="lang" data-value="zig" aria-pressed="false">Zig</button>
+      </div>
+      <div class="panel" data-for="lang" data-value="python">
+        <p>No build step and no Docker. Keep the <code>#!</code> line at the top.</p>
+        <pre class="c">#!/usr/bin/env python3
+import sys
+
+numbers = map(int, sys.stdin.buffer.read().split())
+next(numbers)
+print(sum(numbers))</pre>
+      </div>
+      <div class="panel" data-for="lang" data-value="c" hidden><p>Needs Docker. This writes an executable called <code>sol</code>.</p><pre class="c">arena build -- gcc -O2 -o sol solution.c</pre></div>
+      <div class="panel" data-for="lang" data-value="cpp" hidden><p>Needs Docker. This writes an executable called <code>sol</code>.</p><pre class="c">arena build -- g++ -O2 -std=c++20 -o sol solution.cpp</pre></div>
+      <div class="panel" data-for="lang" data-value="rust" hidden><p>Needs Docker. The executable lands in <code>target/release/solution</code>.</p><pre class="c">arena build -- cargo build --release --bin solution</pre></div>
+      <div class="panel" data-for="lang" data-value="zig" hidden><p>Needs Docker. This writes an executable called <code>sol</code>.</p><pre class="c">arena build -- zig build-exe solution.zig -O ReleaseFast -femit-bin=sol</pre></div>
+      <p class="note"><code>arena build</code> compiles inside the judge's environment, so your program links against the same libraries. On Apple Silicon it runs under emulation.</p>
+    </section>
+
+    <section class="plate" id="submit">
+      <h2><b>5</b>Submit</h2>
+      <p>Give the problem, your executable and your source code. The source is required and is kept for review.</p>
+      <div class="panel" data-for="lang" data-value="python"><pre class="c">arena submit sum solution.py --src solution.py</pre></div>
+      <div class="panel" data-for="lang" data-value="c" hidden><pre class="c">arena submit sum sol --src solution.c</pre></div>
+      <div class="panel" data-for="lang" data-value="cpp" hidden><pre class="c">arena submit sum sol --src solution.cpp</pre></div>
+      <div class="panel" data-for="lang" data-value="rust" hidden><pre class="c">arena submit sum target/release/solution --src src</pre></div>
+      <div class="panel" data-for="lang" data-value="zig" hidden><pre class="c">arena submit sum sol --src solution.zig</pre></div>
+      <p>arena follows the judging and prints the verdict. Check past results at any time:</p>
+      <pre class="c">arena submissions
+arena submissions 42</pre>
+      <ul class="note">
+        <li>The organiser sets a wait between your submissions. It applies across all problems.</li>
+        <li>The executable can be up to 64 MiB and the source up to 16 MiB.</li>
+      </ul>
+    </section>
+
+    <section class="plate" id="board">
+      <h2><b>6</b>Watch the board</h2>
+      <p>Open live boards and charts in your terminal, or use the <a href="/">web leaderboard</a>.</p>
+      <pre class="c">arena board</pre>
+      <p class="note">In the terminal board, <span class="key">1</span> to <span class="key">5</span> or <span class="key">Tab</span> switch between time, memory, time against memory, rank over time and your submissions. <span class="key">Left</span> and <span class="key">Right</span> change the problem. <span class="key">Q</span> quits.</p>
+    </section>
+
+    <section class="plate" id="verdicts">
+      <h2>Verdicts</h2>
+      <div class="table"><table>
+        <thead><tr><th scope="col">Verdict</th><th scope="col">What to do</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verdict ok">accepted</span></td><td>Every test passed. You are on the board. Now make it faster or leaner.</td></tr>
+          <tr><td><span class="verdict">wrong answer</span></td><td>Compare your output with the samples, including edge cases and output format.</td></tr>
+          <tr><td><span class="verdict">time limit exceeded</span></td><td>Use a faster algorithm or faster input and output.</td></tr>
+          <tr><td><span class="verdict">memory limit exceeded</span></td><td>Store less, or process the input as a stream.</td></tr>
+          <tr><td><span class="verdict">output limit exceeded</span></td><td>Your program printed too much. Look for debug output or an endless loop.</td></tr>
+          <tr><td><span class="verdict">runtime error</span></td><td>Your program crashed or exited with an error. Return exit code 0 and check bounds.</td></tr>
+          <tr><td><span class="verdict">judge error</span></td><td>The judge failed, not your code. Tell the organiser, who can judge it again.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="plate" id="ranking">
+      <h2>How ranking works</h2>
+      <ul>
+        <li><strong>Time</strong> is the CPU time of your slowest test. <strong>Memory</strong> is your highest peak across tests.</li>
+        <li>Each test can run several times, and the best time and memory count.</li>
+        <li><strong>Fastest</strong> uses your accepted run with the lowest time. Ties go to lower memory, then the earlier submission.</li>
+        <li><strong>Leanest</strong> uses your accepted run with the lowest memory. Ties go to lower time, then the earlier submission.</li>
+        <li>A worse later submission does not replace your best run.</li>
+        <li>A <strong>frozen</strong> board hides submissions made after the freeze. Everything appears when the round ends.</li>
+      </ul>
+    </section>
+
+    <section class="plate" id="commands">
+      <h2>All commands</h2>
+      <div class="search"><label for="filter">Filter</label><input id="filter" placeholder="submit, password, samples" autocomplete="off" autocapitalize="none" spellcheck="false" aria-controls="commandRows"></div>
+      <div class="table"><table>
+        <thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead>
+        <tbody id="commandRows">
+          <tr><td><code>arena trust [server]</code></td><td>Trust a LAN event's private certificate.</td></tr>
+          <tr><td><code>arena signup [server]</code></td><td>Create an account with the event code and log in.</td></tr>
+          <tr><td><code>arena login [server]</code></td><td>Log in with your username and password.</td></tr>
+          <tr><td><code>arena logout</code></td><td>Log out of this device.</td></tr>
+          <tr><td><code>arena whoami</code></td><td>Show who you are logged in as.</td></tr>
+          <tr><td><code>arena round</code></td><td>Show the current round, its problems and the time left.</td></tr>
+          <tr><td><code>arena problem [name]</code></td><td>Show a statement and samples. Add <code>--samples DIR</code> to save the samples.</td></tr>
+          <tr><td><code>arena build -- CMD</code></td><td>Compile in the judge's environment. Needs Docker.</td></tr>
+          <tr><td><code>arena submit [problem] [file] --src PATH</code></td><td>Submit and follow the judging. Add <code>--no-wait</code> to return after the upload.</td></tr>
+          <tr><td><code>arena submissions [id]</code></td><td>List your submissions in this round, or show one.</td></tr>
+          <tr><td><code>arena board</code></td><td>Open live leaderboards and charts.</td></tr>
+          <tr><td><code>arena completions SHELL</code></td><td>Print a shell completion script.</td></tr>
+        </tbody>
+      </table></div>
+      <p id="noCommands" hidden>No command matches that. Try a shorter word.</p>
+      <p class="note">Leave out an argument in a terminal and arena asks for it. Use <code>--json</code> on read commands for scripts, and <code>arena --help</code> or <code>man arena</code> for every option.</p>
+    </section>
+
+    <section class="plate" id="problems">
+      <h2>Fix a problem</h2>
+      <dl>
+        <div><dt><code>wait N s before submitting again</code></dt><dd>The wait between submissions is still running. Try again after N seconds.</dd></div>
+        <div><dt><code>no round is running</code></dt><dd>Submissions open when the organiser starts the round and close when it ends.</dd></div>
+        <div><dt><code>problem NAME is not in this round</code></dt><dd>Run <code>arena round</code> and copy the problem's short name.</dd></div>
+        <div><dt><code>executable is not for Linux x86-64</code></dt><dd>Build with <code>arena build -- ...</code>, or submit a <code>#!</code> script.</dd></div>
+        <div><dt><code>NAME is not installed on the judge</code></dt><dd>Your <code>#!</code> line names a program the judge lacks. Use <code>python3</code> or build an executable.</dd></div>
+        <div><dt>The source archive is over 16 MiB</dt><dd>Point <code>--src</code> at your source files, not at a folder of build output.</dd></div>
+        <div><dt><code>wrong name or password</code></dt><dd>Check your username. If you forgot your password, ask the organiser to reset it.</dd></div>
+        <div><dt><code>wrong event code</code></dt><dd>Ask the organiser for the current code and enter it exactly.</dd></div>
+        <div><dt>Works on my machine, fails on the judge</dt><dd>Compile with <code>arena build</code> so your program uses the judge's libraries. Read input from standard input and print to standard output.</dd></div>
+      </dl>
+    </section>
+
+    <footer><a href="/">Back to the leaderboard</a> <button class="motion" id="motionBtn" style="margin-left:1em">Pause background</button></footer>
+  </main>
+</div>
+<script>
+"use strict";
+const liquid = (() => {
+  const canvas = document.getElementById("paint");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const button = document.getElementById("motionBtn");
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  const SINE_SIZE = 4096, SINE_STEP = SINE_SIZE / (Math.PI * 2);
+  const sine = new Float32Array(SINE_SIZE);
+  for (let i = 0; i < SINE_SIZE; i++) sine[i] = Math.sin(i / SINE_STEP);
+  const wave = (x) => sine[(x * SINE_STEP | 0) & (SINE_SIZE - 1)];
+  const ramp = new Uint32Array([[4, 8, 24], [8, 18, 51], [8, 18, 51], [13, 29, 79], [13, 29, 79], [19, 48, 128]]
+    .map(([r, g, b]) => (255 << 24 | b << 16 | g << 8 | r) >>> 0));
+  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  let field = null, clock = 0, last = 0, wait = 83, frame = 0;
+
+  function saved() { try { return localStorage.getItem("arena.motion"); } catch { return null; } }
+  function save(v) { try { localStorage.setItem("arena.motion", v); } catch {} }
+  let moving = saved() ? saved() === "on" : !calm.matches;
+
+  function build() {
+    const cell = Math.max(3, Math.ceil(innerWidth / 640));
+    const w = canvas.width = Math.ceil(innerWidth / cell);
+    const h = canvas.height = Math.ceil(innerHeight / cell);
+    const n = w * h, scale = Math.min(w, h) * .72;
+    const f = { n, image: ctx.createImageData(w, h), spiral: new Float32Array(n), swirl: new Float32Array(n), cross: new Float32Array(n),
+      across: new Float32Array(n), down: new Float32Array(n), gain: new Float32Array(n), grain: new Float32Array(n) };
+    f.pixels = new Uint32Array(f.image.data.buffer);
+    for (let y = 0, i = 0; y < h; y++) {
+      for (let x = 0; x < w; x++, i++) {
+        const u = (x - w / 2) / scale, v = (y - h / 2) / scale;
+        const r = Math.hypot(u, v), a = Math.atan2(v, u);
+        f.spiral[i] = 11.4 * r ** 1.55 + 3 * a;
+        f.swirl[i] = 2.4 * r - 2 * a;
+        f.cross[i] = 5 * u + 3 * v;
+        f.across[i] = 3.4 * u;
+        f.down[i] = 3.8 * v;
+        f.gain[i] = Math.max(.2, Math.min(1, 1.08 - .34 * r)) * Math.min(1, r / .2);
+        f.grain[i] = (bayer[(y % 4) * 4 + x % 4] / 16 - .47) * .2;
+      }
+    }
+    field = f;
+  }
+
+  function draw(t) {
+    const { n, spiral, swirl, cross, across, down, gain, grain, pixels, image } = field;
+    const flow = t * .34, a = t * .27, b = t * .19, c = t * .31, d = t * .23;
+    for (let i = 0; i < n; i++) {
+      const phase = spiral[i] - flow + 1.6 * wave(swirl[i] + a) + .6 * wave(cross[i] - b) + .5 * wave(down[i] + c) + .5 * wave(across[i] - d);
+      const level = ((wave(phase) + 1) * .5 * gain[i] + grain[i]) * 6 | 0;
+      pixels[i] = ramp[level < 0 ? 0 : level > 5 ? 5 : level];
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+
+  function tick(now) {
+    frame = 0;
+    if (!moving) return;
+    frame = requestAnimationFrame(tick);
+    const gap = now - last;
+    if (gap < wait) return;
+    last = now;
+    clock += Math.min(gap, 250) / 1000;
+    const start = performance.now();
+    draw(clock);
+    wait = Math.max(83, (performance.now() - start) * 8);
+  }
+
+  function label() {
+    if (!button) return;
+    button.textContent = moving ? "Pause background" : "Play background";
+    button.setAttribute("aria-pressed", String(!moving));
+  }
+  function setMoving(on) {
+    moving = on;
+    label();
+    if (on && !frame) { last = performance.now(); frame = requestAnimationFrame(tick); }
+  }
+
+  build();
+  draw(clock);
+  label();
+  setMoving(moving);
+  if (button) button.onclick = () => { save(moving ? "off" : "on"); setMoving(!moving); };
+  calm.addEventListener("change", () => { if (!saved()) setMoving(!calm.matches); });
+  addEventListener("keydown", (e) => {
+    if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.matches("input")) {
+      save(moving ? "off" : "on");
+      setMoving(!moving);
+    }
+  });
+  let resizeTimer;
+  addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { build(); draw(clock); }, 150); });
+  return { isMoving: () => moving, cost() { const s = performance.now(); for (let i = 0; i < 20; i++) draw(clock); return (performance.now() - s) / 20; } };
+})();
+
+const store = {
+  get(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+for (const n of document.querySelectorAll("pre, code")) {
+  if (n.textContent.includes("https://<domain>")) n.textContent = n.textContent.replaceAll("https://<domain>", location.origin);
+}
+document.getElementById("trustBlock").hidden = location.protocol !== "https:";
+
+for (const pre of document.querySelectorAll("pre.c")) {
+  const wrap = document.createElement("div");
+  wrap.className = "cmd";
+  pre.replaceWith(wrap);
+  pre.tabIndex = 0;
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "Copy";
+  copy.onclick = async () => {
+    let done = false;
+    try { await navigator.clipboard.writeText(pre.textContent); done = true; } catch {}
+    if (!done) getSelection().selectAllChildren(pre);
+    copy.textContent = done ? "Copied" : "Press Ctrl+C";
+    setTimeout(() => { copy.textContent = "Copy"; }, 1800);
+  };
+  wrap.append(pre, copy);
+}
+
+function choose(group, value) {
+  for (const b of document.querySelectorAll(`[data-group="${group}"]`)) b.setAttribute("aria-pressed", String(b.dataset.value === value));
+  for (const p of document.querySelectorAll(`[data-for="${group}"]`)) p.hidden = p.dataset.value !== value;
+  store.set("arena.guide." + group, value);
+}
+for (const b of document.querySelectorAll("[data-group]")) b.onclick = () => choose(b.dataset.group, b.dataset.value);
+const savedLang = store.get("arena.guide.lang");
+if (document.querySelector(`[data-group="lang"][data-value="${CSS.escape(savedLang)}"]`)) choose("lang", savedLang);
+const savedOs = store.get("arena.guide.os");
+choose("os", savedOs === "windows" || savedOs === "unix" ? savedOs : /Windows/.test(navigator.userAgent) ? "windows" : "unix");
+
+const filter = document.getElementById("filter");
+const rows = [...document.querySelectorAll("#commandRows tr")];
+filter.addEventListener("input", () => {
+  const q = filter.value.trim().toLowerCase();
+  let shown = 0;
+  for (const r of rows) { r.hidden = !r.textContent.toLowerCase().includes(q); if (!r.hidden) shown++; }
+  document.getElementById("noCommands").hidden = shown > 0;
+});
+addEventListener("keydown", (e) => {
+  if (e.key === "/" && !e.target.matches("input") && !e.ctrlKey && !e.metaKey) { e.preventDefault(); filter.focus(); }
+  if (e.key === "Escape" && e.target === filter) { filter.value = ""; filter.dispatchEvent(new Event("input")); filter.blur(); }
+});
+
+const links = [...document.querySelectorAll("#toc a")];
+const sections = links.map((a) => document.querySelector(a.getAttribute("href")));
+function spy() {
+  let current = 0;
+  sections.forEach((s, i) => { if (s.getBoundingClientRect().top <= innerHeight * .3) current = i; });
+  if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) current = sections.length - 1;
+  links.forEach((a, i) => { if (i === current) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current"); });
+}
+addEventListener("scroll", spy, { passive: true });
+spy();
+</script>
+</body>
+</html>
