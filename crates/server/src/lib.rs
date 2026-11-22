@@ -152,6 +152,7 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/", get(projector))
         .route("/join", get(accounts::page))
+        .route("/help", get(guide))
         .route("/healthz", get(|| async { "ok" }))
         .route("/ws", get(ws::handler))
         .route("/api/info", get(info))
@@ -178,6 +179,11 @@ pub fn app(state: AppState) -> Router {
             limiter,
             net_limit::limit_requests,
         ))
+}
+
+/// The participant guide, built into the binary.
+async fn guide() -> axum::response::Html<&'static str> {
+    axum::response::Html(include_str!("../../../web/help.html"))
 }
 
 /// The read-only leaderboard page for a projector, built into the binary.

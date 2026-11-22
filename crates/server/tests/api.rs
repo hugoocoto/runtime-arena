@@ -525,3 +525,11 @@ async fn sign_up_is_off_without_a_join_code() {
     assert_eq!(status, StatusCode::OK);
     assert!(body.as_str().unwrap().contains("/api/signup"));
 }
+
+#[tokio::test]
+async fn participant_guide_is_public() {
+    let s = TestServer::new().await;
+    let (status, body) = s.get("/help", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.as_str().unwrap().contains("arena submit"));
+}
