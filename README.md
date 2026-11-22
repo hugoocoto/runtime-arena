@@ -1,4 +1,11 @@
-# Runtime Arena
+<h1 align="center"><img src=".github/assets/banner.png" alt="Runtime Arena" width="100%"></h1>
+
+<p align="center">
+  <a href="#participant-quickstart"><img src=".github/assets/nav-join.png" alt="Join a contest" height="45"></a>
+  <a href="#hosting-a-contest"><img src=".github/assets/nav-host.png" alt="Host a contest" height="45"></a>
+  <a href="#installing-the-cli"><img src=".github/assets/nav-install.png" alt="Install the CLI" height="45"></a>
+  <a href="#participant-command-reference"><img src=".github/assets/nav-commands.png" alt="Commands" height="45"></a>
+</p>
 
 A self-hosted judge for small programming contests where participants are
 ranked by how **fast** and how **lean** their solutions run.
@@ -12,10 +19,17 @@ sandbox and keeps live time and memory leaderboards per problem, in the terminal
 > **Status: v0, untested in a real event.** Run a mock contest before relying
 > on it.
 
+<p align="center"><img src=".github/assets/leaderboard.png" alt="The live leaderboard with sample data: Fastest and Leanest boards, a round clock and a signal timeline" width="100%"></p>
+
+<img src=".github/assets/divider.png" alt="" width="100%">
+
 ## Participant quickstart
 
 This is the handout for participants. They do not need Rust or Docker if they
 use a `#!` script such as Python.
+
+Every server also hosts a full participant guide at `https://<domain>/help`, with
+steps for each language, verdicts, every command and common fixes.
 
 1. Install `arena`:
 
@@ -73,6 +87,8 @@ use a `#!` script such as Python.
    The board ranks accepted solutions by CPU time and peak memory. For C, C++,
    Rust, or another compiled language, use `arena build` only if Docker is
    installed locally; the Python path above is the quickest first submission.
+
+<img src=".github/assets/divider.png" alt="" width="100%">
 
 ## Hosting a contest
 
@@ -214,6 +230,8 @@ ARENA_SERVER=https://<domain> ARENA_ADMIN_TOKEN=... ARENA_JOIN_CODE=... scripts/
 - Run `scripts/host-tuning.sh` to see settings that reduce noise (CPU governor,
   turbo, SMT, ...), and `sudo scripts/host-tuning.sh --apply` on a dedicated machine.
 
+<img src=".github/assets/divider.png" alt="" width="100%">
+
 ## Installing the CLI
 
 On Linux and macOS:
@@ -241,6 +259,8 @@ Or download an archive from the
 [releases](https://github.com/hugoocoto/runtime-arena/releases), unpack it, and run
 `sudo make install` to install to `/usr/local` (`sudo make uninstall` removes it).
 On Windows, `arena completions powershell` prints its completions.
+
+<img src=".github/assets/divider.png" alt="" width="100%">
 
 ## Participant command reference
 
@@ -280,6 +300,8 @@ The Cargo command writes its binary to `target/release/solution`; the other
 examples write `sol`. Submit the resulting executable with `arena submit`,
 including the source with `--src`.
 
+<img src=".github/assets/divider.png" alt="" width="100%">
+
 ## Development
 
 ```sh
@@ -289,6 +311,8 @@ scripts/judge-tests.sh     # judge crate tests against a real isolate (needs Doc
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+<img src=".github/assets/divider.png" alt="" width="100%">
 
 ## License
 
