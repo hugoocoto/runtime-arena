@@ -5,3 +5,15 @@ data/
 *.md
 !README.md
 problems/
+
+# Secrets must never reach an image or its build layers.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+**/*.pem
+**/*.key

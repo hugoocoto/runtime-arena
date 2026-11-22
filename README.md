@@ -9,8 +9,8 @@ server runs it against hidden tests in an [isolate](https://github.com/ioi/isola
 sandbox and keeps live time and memory leaderboards per problem, in the terminal
 (`arena board`) and on a projector page.
 
-> **Status: v0, untested in a real event.** Everything in [PLAN.md](PLAN.md) is
-> built and covered by tests; run a mock contest before relying on it.
+> **Status: v0, untested in a real event.** Run a mock contest before relying
+> on it.
 
 ## Participant quickstart
 
