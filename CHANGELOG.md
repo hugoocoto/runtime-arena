@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/hugoocoto/runtime-arena/compare/v0.9.1...v0.10.0) (2026-11-22)
+
+
+### Features
+
+* **web:** redesign the web UI and add a participant guide ([#26](https://github.com/hugoocoto/runtime-arena/issues/26)) ([c9f3962](https://github.com/hugoocoto/runtime-arena/commit/c9f3962779ee6cca3c503d746062618605c95a7c))
+
 ## [0.9.1](https://github.com/hugoocoto/runtime-arena/compare/v0.9.0...v0.9.1) (2026-11-22)
 
 
