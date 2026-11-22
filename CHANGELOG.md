@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.1](https://github.com/hugoocoto/runtime-arena/compare/v0.9.0...v0.9.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **deps:** bump url to 2.5.9 ([#25](https://github.com/hugoocoto/runtime-arena/issues/25)) ([fc8a1d1](https://github.com/hugoocoto/runtime-arena/commit/fc8a1d181da8cb9414c3f710ba1be542483ab809))
+* **hosting:** contest hosting and signup flow ([#21](https://github.com/hugoocoto/runtime-arena/issues/21)) ([1672e85](https://github.com/hugoocoto/runtime-arena/commit/1672e85c9ca7e9c46a57de9d6ab0bb1424b4d9c5))
+* serve HTTPS to clients connecting by LAN IP ([#24](https://github.com/hugoocoto/runtime-arena/issues/24)) ([6d587a6](https://github.com/hugoocoto/runtime-arena/commit/6d587a660c2e9b7df689b477006a9a12d7c70c4e))
+
 ## [0.9.0](https://github.com/hugoocoto/runtime-arena/compare/v0.8.0...v0.9.0) (2026-11-21)
 
 
