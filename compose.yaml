@@ -31,14 +31,16 @@ services:
 
   caddy:
     image: caddy:2.10.2-alpine
+    # Binds ports 80 and 443 on the host. Clients send no TLS server name when
+    # connecting to an IP, so Caddy picks the certificate by the address they
+    # connected to, which it can only see on the host network.
+    network_mode: host
     depends_on:
       arena:
         condition: service_started
     environment:
       ARENA_DOMAIN: ${ARENA_DOMAIN:-localhost}
-    ports:
-      - "80:80"
-      - "443:443"
+      ARENA_UPSTREAM: 127.0.0.1:${ARENA_PORT:-8080}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

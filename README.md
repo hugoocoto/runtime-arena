@@ -98,8 +98,11 @@ scripts/deploy.sh
 
 Compose starts a small Caddy proxy alongside the judge. It obtains and renews a
 public certificate automatically with Let's Encrypt. `ARENA_DOMAIN` must resolve
-to this host, and ports 80 and 443 must be open. For a private rehearsal,
-`ARENA_DOMAIN=localhost` uses Caddy's local CA instead. The organiser's CLI keeps
+to this host, and ports 80 and 443 must be open. For an event on a local network,
+set `ARENA_DOMAIN` to the host's LAN IP address. Caddy then uses its local CA, and
+participants run `arena trust` once. If the IP changes, update `.env` and run
+`docker compose up -d`. For a private rehearsal, `ARENA_DOMAIN=localhost` also
+uses the local CA. The organiser's CLI keeps
 using `http://localhost:${ARENA_PORT}` through the local-only port; participants
 use `https://<domain>`.
 
