@@ -1,21 +1,50 @@
+# Build output
 /target
-/data
-/backups
-.env
 /tests/sandbox/out
+
+# Large tests, written by problems/sum/gen.py
 /problems/sum/tests/03.*
 /problems/sum/tests/04.*
 
-# Secrets and local environments
-.env.*
-!.env.example
-
-# Generated or downloaded by the CLI and release job
-/extras
-/submission-*.tar.gz
+# Server data and backups
+/data
+/backups
 *.db
 *.db-shm
 *.db-wal
+*.db-journal
+
+# Secrets and local environments
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated or downloaded by the CLI and release job
+/extras
+/extras.tar.gz
+/assets
+/SHA256SUMS
+/arena-*
+/submission-*.tar.gz
+
+# Logs and crash dumps
+*.log
+core.[0-9]*
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings
+.claude/settings.local.json
+CLAUDE.local.md
 
 # Private notes
 /DISTRIBUTION.md
