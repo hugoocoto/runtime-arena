@@ -1,9 +1,14 @@
+{
+	# Caddy runs on the host network, so keep its admin API off the host.
+	admin off
+}
+
 # Caddy obtains and renews the certificate automatically when ARENA_DOMAIN is a
-# public DNS name pointing at this host. With the default `localhost`, Caddy uses
-# its local CA instead, which is useful for a private rehearsal.
+# public DNS name pointing at this host. With `localhost` or a LAN IP address,
+# Caddy uses its local CA instead, and participants run `arena trust` once.
 {$ARENA_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy arena:8080
+	reverse_proxy {$ARENA_UPSTREAM:127.0.0.1:8080}
 }
 
 # The LAN CA is public information and is served over plain HTTP solely to let
