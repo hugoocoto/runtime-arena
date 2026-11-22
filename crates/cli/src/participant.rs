@@ -101,7 +101,7 @@ fn target_server(server: Option<&str>, command: &str) -> Result<String> {
 }
 
 /// A password from standard input or a hidden prompt, typed twice if `confirm`.
-fn read_password(from_stdin: bool, confirm: bool) -> Result<String> {
+fn read_password(from_stdin: bool, confirm: bool, min_length: Option<usize>) -> Result<String> {
     if from_stdin {
         if ask::is_interactive() {
             return Err(UsageError("--password-stdin needs the password piped in".into()).into());
@@ -112,16 +112,33 @@ fn read_password(from_stdin: bool, confirm: bool) -> Result<String> {
         if password.is_empty() {
             return Err(UsageError("no password on standard input".into()).into());
         }
+        if let Some(min_length) = min_length
+            && password.chars().count() < min_length
+        {
+            return Err(UsageError(format!(
+                "the password needs at least {min_length} characters"
+            ))
+            .into());
+        }
         return Ok(password);
     }
     if !ask::is_interactive() {
         return Err(UsageError("missing password; pipe it in with --password-stdin".into()).into());
     }
-    let password = rpassword::prompt_password("Password: ")?;
-    if confirm && password != rpassword::prompt_password("Repeat password: ")? {
-        bail!("the passwords don't match");
+    loop {
+        let password = rpassword::prompt_password("Password: ")?;
+        if confirm && password != rpassword::prompt_password("Repeat password: ")? {
+            eprintln!("error: the passwords don't match");
+            continue;
+        }
+        if let Some(min_length) = min_length
+            && password.chars().count() < min_length
+        {
+            eprintln!("error: the password needs at least {min_length} characters");
+            continue;
+        }
+        return Ok(password);
     }
-    Ok(password)
 }
 
 /// Exchanges name and password for a device token and saves it.
@@ -152,7 +169,7 @@ pub async fn login(
 ) -> Result<()> {
     let server = target_server(server, "login")?;
     let name: String = ask::required("Username", "--username", username)?;
-    let password = read_password(password_stdin, false)?;
+    let password = read_password(password_stdin, false, None)?;
     log_in(&server, name, password).await
 }
 
@@ -167,7 +184,13 @@ pub async fn signup(
     let server = target_server(server, "signup")?;
     let name: String = ask::required("Username", "--username", username)?;
     let join_code: String = ask::required("Event code", "--join-code", join_code)?;
-    let password = read_password(password_stdin, true)?;
+    let display_name: String = ask::optional(
+        "Name on leaderboard",
+        display_name,
+        name.clone(),
+        ask::is_interactive(),
+    )?;
+    let password = read_password(password_stdin, true, Some(6))?;
     let saved = Config::load_file()?;
     let ca = (saved.server.as_deref().map(crate::client::normalise_server) == Some(server.clone()))
         .then_some(saved.ca_certificate)
@@ -177,7 +200,7 @@ pub async fn signup(
             "/api/signup",
             &SignupRequest {
                 name,
-                display_name,
+                display_name: Some(display_name),
                 password: password.clone(),
                 join_code,
             },
