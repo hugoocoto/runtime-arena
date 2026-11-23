@@ -57,6 +57,7 @@ async fn run(cli: Cli) -> Result<bool> {
             participant::logout(admin).await?;
             return Ok(true);
         }
+        Command::Pull { image } => return participant::pull(&image),
         Command::Completions { shell } => {
             generate::completions(shell, &mut std::io::stdout());
             return Ok(true);
@@ -73,6 +74,7 @@ async fn run(cli: Cli) -> Result<bool> {
         | Command::Trust { .. }
         | Command::Login { .. }
         | Command::Logout { .. }
+        | Command::Pull { .. }
         | Command::Completions { .. }
         | Command::Generate { .. } => unreachable!("handled above"),
         Command::Whoami { json } => participant::whoami(&config, json).await?,

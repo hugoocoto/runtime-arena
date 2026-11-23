@@ -697,12 +697,26 @@ pub fn build(image: &str, command: &[String]) -> Result<bool> {
             docker.args(["--user", &format!("{uid}:{gid}")]);
         }
     }
-    let status = docker.arg(image).args(command).status().context(
-        "cannot run Docker; is it installed and running? For a first submission, use a ".to_owned()
-            + "#!/usr/bin/env python3 script instead",
-    )?;
+    let status = docker
+        .arg(image)
+        .args(command)
+        .status()
+        .context(DOCKER_UNAVAILABLE)?;
     Ok(status.success())
 }
+
+/// Downloads the build image for the platform `build` runs it on.
+pub fn pull(image: &str) -> Result<bool> {
+    let status = std::process::Command::new("docker")
+        .args(["pull", "--platform", "linux/amd64"])
+        .arg(image)
+        .status()
+        .context(DOCKER_UNAVAILABLE)?;
+    Ok(status.success())
+}
+
+const DOCKER_UNAVAILABLE: &str = "cannot run Docker; is it installed and running? \
+    For a first submission, use a #!/usr/bin/env python3 script instead";
 
 #[cfg(unix)]
 fn id_flag(flag: &str) -> Option<String> {

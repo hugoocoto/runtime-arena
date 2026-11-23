@@ -220,7 +220,7 @@ print(sum(numbers))</pre>
       <div class="panel" data-for="lang" data-value="cpp" hidden><p>Needs Docker. This writes an executable called <code>sol</code>.</p><pre class="c">arena build -- g++ -O2 -std=c++20 -o sol solution.cpp</pre></div>
       <div class="panel" data-for="lang" data-value="rust" hidden><p>Needs Docker. The executable lands in <code>target/release/solution</code>.</p><pre class="c">arena build -- cargo build --release --bin solution</pre></div>
       <div class="panel" data-for="lang" data-value="zig" hidden><p>Needs Docker. This writes an executable called <code>sol</code>.</p><pre class="c">arena build -- zig build-exe solution.zig -O ReleaseFast -femit-bin=sol</pre></div>
-      <p class="note"><code>arena build</code> compiles inside the judge's environment, so your program links against the same libraries. On Apple Silicon it runs under emulation.</p>
+      <p class="note"><code>arena build</code> compiles inside the judge's environment, so your program links against the same libraries. On Apple Silicon it runs under emulation. The image is large, so run <code>arena pull</code> before the contest to download it.</p>
     </section>
 
     <section class="plate" id="submit">
@@ -288,6 +288,7 @@ arena submissions 42</pre>
           <tr><td><code>arena whoami</code></td><td>Show who you are logged in as.</td></tr>
           <tr><td><code>arena round</code></td><td>Show the current round, its problems and the time left.</td></tr>
           <tr><td><code>arena problem [name]</code></td><td>Show a statement and samples. Add <code>--samples DIR</code> to save the samples.</td></tr>
+          <tr><td><code>arena pull</code></td><td>Download the build image ahead of time. Needs Docker.</td></tr>
           <tr><td><code>arena build -- CMD</code></td><td>Compile in the judge's environment. Needs Docker.</td></tr>
           <tr><td><code>arena submit [problem] [file] --src PATH</code></td><td>Submit and follow the judging. Add <code>--no-wait</code> to return after the upload.</td></tr>
           <tr><td><code>arena submissions [id]</code></td><td>List your submissions in this round, or show one.</td></tr>

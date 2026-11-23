@@ -5,6 +5,11 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
 
+const BUILD_IMAGE: &str = concat!(
+    "ghcr.io/hugoocoto/runtime-arena-build-env:",
+    env!("CARGO_PKG_VERSION")
+);
+
 /// Runtime Arena: submit solutions and follow the contest from your terminal.
 /// In a terminal, arguments you leave out are asked for.
 #[derive(Parser)]
@@ -82,10 +87,16 @@ pub enum Command {
     /// Build in the judge's environment (Docker): `arena build -- gcc -O2 -o sol sol.c`.
     Build {
         /// Build image to use.
-        #[arg(long, default_value = concat!("ghcr.io/hugoocoto/runtime-arena-build-env:", env!("CARGO_PKG_VERSION")))]
+        #[arg(long, default_value = BUILD_IMAGE)]
         image: String,
         #[arg(last = true)]
         command: Vec<String>,
+    },
+    /// Download the build image now, so the first `arena build` doesn't have to.
+    Pull {
+        /// Build image to download.
+        #[arg(long, default_value = BUILD_IMAGE)]
+        image: String,
     },
     /// Submit an executable and follow its judging.
     Submit {
@@ -260,6 +271,19 @@ mod tests {
         assert!(positive_id("0").is_err());
         assert!(positive_id("abc").unwrap_err().contains("positive"));
         assert!(whole_number("-1").is_err());
+    }
+
+    #[test]
+    fn pull_defaults_to_the_image_build_uses() {
+        let Command::Pull { image: pulled } = Cli::parse_from(["arena", "pull"]).command else {
+            panic!("expected pull");
+        };
+        let Command::Build { image: built, .. } =
+            Cli::parse_from(["arena", "build", "--", "true"]).command
+        else {
+            panic!("expected build");
+        };
+        assert_eq!(pulled, built);
     }
 
     #[test]
