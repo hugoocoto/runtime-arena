@@ -68,7 +68,8 @@ arena build -- env ZIG_GLOBAL_CACHE_DIR=.zig-cache zig build-exe solution.zig -O
 arena submit sum sol --src solution.c
 ```
 
-The first build downloads a large image, so run one before the contest starts.
+The build image is large, so download it with `arena pull` before the contest
+starts. You don't need an account or any code for this.
 
 Every server hosts a full participant guide at `https://<domain>/help`.
 
@@ -197,6 +198,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena whoami` | Show the current account and server |
 | `arena round` | Show the round, its problems and time left |
 | `arena problem <slug> [--samples <dir>]` | Show a statement and save samples |
+| `arena pull` | Download the build image ahead of time (Docker) |
 | `arena build -- <command>` | Build in the judge's environment (Docker) |
 | `arena submit <problem> <executable> --src <path>` | Submit and follow judging |
 | `arena submissions [id]` | List your submissions or show one |
