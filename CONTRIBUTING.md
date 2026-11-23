@@ -7,9 +7,11 @@
    (`feat: ...`, `fix(judge): ...`, `docs: ...`). PRs are squash-merged, so the
    title becomes the commit that [release-please](https://github.com/googleapis/release-please)
    uses to pick the next version and write the changelog.
-3. CI must pass: formatting, clippy with warnings denied, tests, cargo-deny
-   (licenses and advisories), CLI builds on macOS and Windows, the sandbox
-   verdict check and the judge's sandbox tests.
+3. CI must pass: formatting, clippy with warnings denied, tests, up-to-date
+   `.sqlx/` data, cargo-deny (licenses and advisories), CLI tests and installers
+   on macOS and Windows, shellcheck, the sandbox verdict check, the judge's
+   sandbox tests and an end-to-end contest. Release PRs also build every release
+   target. Keep the whole workflow within about 3 minutes.
 
    Plain `cargo test` skips the judge tests that need isolate (they print
    "skipped"). Run them with `scripts/judge-tests.sh`, which builds a test image
@@ -31,6 +33,7 @@ macOS and Windows and pushes the `server` and `build-env` images to GHCR.
 | `crates/cli` | `arena` CLI |
 | `docker/` | Dockerfile (`server`, `build-env` targets) and entrypoint |
 | `tests/sandbox` | programs and checks for the sandbox verdict test |
+| `tests/e2e`, `tests/install` | end-to-end contest and installer tests |
 | `crates/judge/tests` | judge tests against real isolate, with fixture problems |
 | `crates/server/migrations` | SQLite schema migrations |
 | `crates/server/tests`, `crates/cli/tests` | API, queue, WebSocket and CLI tests with a fake judge |

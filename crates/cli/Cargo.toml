@@ -38,7 +38,11 @@ name = "arena"
 path = "src/main.rs"
 
 [dev-dependencies]
+tempfile = "3.27.0"
+
+# For tests/cli.rs. The server only builds on Unix, and this keeps the CLI's
+# macOS and Windows test runs fast.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
 arena-judge = { path = "../judge" }
 arena-server = { path = "../server" }
 axum = "0.8.9"
-tempfile = "3.27.0"

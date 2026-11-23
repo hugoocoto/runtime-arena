@@ -55,7 +55,8 @@ WORKDIR /src
 ENV SQLX_OFFLINE=true
 
 FROM chef AS planner
-COPY . .
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates crates
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS rust
@@ -67,7 +68,11 @@ ARG CARGO_PROFILE_RELEASE_CODEGEN_UNITS
 COPY rust-toolchain.toml ./
 COPY --from=planner /src/recipe.json recipe.json
 RUN cargo chef cook --release --locked -p arena-server --recipe-path recipe.json
-COPY . .
+# Only what the build reads, so other changes keep this layer cached.
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+COPY web web
+COPY .sqlx .sqlx
 RUN cargo build --release --locked -p arena-server \
  && cp target/release/arena-server /arena-server
 
@@ -100,10 +105,23 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY rust-toolchain.toml ./
 COPY --from=planner /src/recipe.json recipe.json
 RUN cargo chef cook --tests --locked -p arena-judge --recipe-path recipe.json
-COPY . .
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+COPY tests/sandbox tests/sandbox
 RUN cargo test --no-run --locked -p arena-judge
 ENV ARENA_ISOLATE_TESTS=1 \
     ARENA_BOX_STORAGE=/var/local/lib/arena-boxes \
-    ARENA_BOX_COUNT=24
+    ARENA_BOX_COUNT=24 \
+    ARENA_DISK_MB=16
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["cargo", "test", "--locked", "-p", "arena-judge"]
+
+# The sandbox smoke test's programs, compiled in build-env. CI exports them with
+# --output, which avoids loading the large build-env image into Docker. Needs
+# BuildKit: the classic builder would build every stage above first.
+FROM build-env AS sandbox-build
+COPY tests/sandbox /tests
+RUN /tests/build.sh
+
+FROM scratch AS sandbox-programs
+COPY --from=sandbox-build /tests/out/ /

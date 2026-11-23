@@ -1,4 +1,5 @@
 //! The CLI's commands against an in-process server with a fake judge.
+#![cfg(target_os = "linux")]
 
 use std::path::Path;
 use std::sync::Arc;

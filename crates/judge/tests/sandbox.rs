@@ -199,6 +199,47 @@ async fn output_limit() {
 }
 
 #[tokio::test]
+async fn network_is_unreachable() {
+    if !enabled() {
+        return;
+    }
+    // Prints "NETWORK OPEN" and exits 0 if it connects, which would be a wrong answer.
+    let r = judge(6, "sum", "net.py", once()).await;
+    assert_eq!(verdicts(&r), [Verdict::RuntimeError; 2]);
+}
+
+#[tokio::test]
+async fn cannot_leave_the_box() {
+    if !enabled() {
+        return;
+    }
+    let r = judge(7, "sum", "escape", once()).await;
+    assert_eq!(verdicts(&r), [Verdict::Accepted, Verdict::Accepted]);
+}
+
+#[tokio::test]
+async fn process_limit_stops_a_fork_bomb() {
+    if !enabled() {
+        return;
+    }
+    let config = JudgeConfig {
+        processes: 8,
+        ..once()
+    };
+    let r = judge(8, "sum", "forks", config).await;
+    assert_eq!(verdicts(&r), [Verdict::Accepted, Verdict::Accepted]);
+}
+
+#[tokio::test]
+async fn disk_limit_stops_a_full_box() {
+    if !enabled() {
+        return;
+    }
+    let r = judge(9, "sum", "disk", once()).await;
+    assert_eq!(verdicts(&r), [Verdict::Accepted, Verdict::Accepted]);
+}
+
+#[tokio::test]
 async fn output_replaced_by_a_symlink_is_not_trusted() {
     if !enabled() {
         return;

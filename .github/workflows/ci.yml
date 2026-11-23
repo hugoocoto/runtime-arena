@@ -1,5 +1,7 @@
 name: CI
 
+# Jobs run in parallel to keep the whole workflow within about 3 minutes. Any new
+# check should fit that budget: add it to a short job or give it its own.
 on:
   pull_request:
   push:
@@ -24,10 +26,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The toolchain comes from rust-toolchain.toml; rustup installs it on first use.
+      # The cache also keeps sqlx-cli, so it is only compiled once per version.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      - name: Check .sqlx is up to date
+        run: |
+          command -v cargo-sqlx >/dev/null ||
+            cargo install --locked sqlx-cli --version 0.9.1 --no-default-features --features sqlite
+          scripts/sqlx-prepare.sh --check
 
   cli:
     name: CLI builds on ${{ matrix.os }}
@@ -36,13 +44,34 @@ jobs:
       matrix:
         os: [macos-26, windows-2025]
     runs-on: ${{ matrix.os }}
+    # Release PRs skip the steps, not the job: a job-level `if` is evaluated before
+    # the matrix expands, so the required "CLI builds on <os>" checks would never report.
+    # Pushes to main still build, because PRs restore the cache they save.
+    env:
+      RELEASE_PR: ${{ startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - run: cargo build --locked -p arena-cli
+      - if: env.RELEASE_PR != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: env.RELEASE_PR != 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - if: env.RELEASE_PR != 'true'
+        run: cargo build --locked -p arena-cli
+      - if: env.RELEASE_PR != 'true'
+        run: cargo test --locked -p arena-cli
+      - name: Test install.sh
+        if: env.RELEASE_PR != 'true' && runner.os == 'macOS'
+        run: sh tests/install/test.sh
+      - name: Test install.ps1
+        if: env.RELEASE_PR != 'true' && runner.os == 'Windows'
+        shell: powershell
+        env:
+          ARENA_EXE: target/debug/arena.exe
+        run: ./tests/install/test.ps1
 
   deny:
     name: cargo-deny
+    # Feature PRs only. The fork check stops a fork skipping checks by branch name.
+    if: github.event_name == 'pull_request' && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,15 +79,21 @@ jobs:
 
   deployment:
     name: Compose HTTPS deployment
+    if: github.event_name == 'pull_request' && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Validate Compose and shell scripts
+      - name: Validate Compose
         run: |
           ARENA_ADMIN_TOKEN=ci-compose-validation-token-123456 \
           ARENA_DOMAIN=localhost \
           docker compose --env-file /dev/null config --quiet
-          sh -n scripts/*.sh
+      - name: Lint shell scripts
+        run: |
+          git ls-files -z '*.sh' |
+            xargs -0 docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 --severity=warning
+      - name: Test install.sh
+        run: sh tests/install/test.sh
       - name: Validate Caddy configuration
         run: |
           docker pull caddy:2.10.2-alpine
@@ -68,22 +103,23 @@ jobs:
             caddy:2.10.2-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
-  sandbox:
-    name: sandbox verdicts (isolate in compose)
+  smoke:
+    name: sandbox smoke and end-to-end
+    if: ${{ !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      # Built with the GitHub Actions layer cache, then loaded for the script.
+      # Layer caches are saved on main only; PRs read them.
+      # The programs are exported as files, so build-env is never loaded.
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
-          target: build-env
-          tags: runtime-arena-build-env:dev
-          load: true
+          target: sandbox-programs
+          outputs: type=local,dest=tests/sandbox/out
           cache-from: type=gha,scope=build-env
-          cache-to: type=gha,mode=max,scope=build-env
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=build-env' || '' }}
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -91,17 +127,29 @@ jobs:
           target: server
           tags: ghcr.io/${{ github.repository }}-server:latest
           load: true
-          # The smoke test doesn't run the server binary, so skip optimising it.
+          # Compile fast: these tests don't depend on the server being optimised.
           # Its own cache scope keeps these layers apart from the release build.
           build-args: |
             CARGO_PROFILE_RELEASE_LTO=off
             CARGO_PROFILE_RELEASE_OPT_LEVEL=0
             CARGO_PROFILE_RELEASE_CODEGEN_UNITS=256
           cache-from: type=gha,scope=server-ci
-          cache-to: type=gha,mode=max,scope=server-ci
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=server-ci' || '' }}
       - run: ./scripts/sandbox-smoke.sh
         env:
           SKIP_BUILD: "1"
+      - run: ./scripts/e2e.sh
+        env:
+          SKIP_BUILD: "1"
+          ARENA_IMAGE: ghcr.io/${{ github.repository }}-server:latest
+
+  judge:
+    name: judge tests (real isolate)
+    if: ${{ !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -110,7 +158,74 @@ jobs:
           tags: runtime-arena-judge-test:dev
           load: true
           cache-from: type=gha,scope=judge-test
-          cache-to: type=gha,mode=max,scope=judge-test
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=judge-test' || '' }}
       - run: ./scripts/judge-tests.sh
         env:
           SKIP_BUILD: "1"
+
+  # Release PRs only: builds what the release workflow will publish, so a broken
+  # target is found before the tag exists.
+  release-cli:
+    name: release build ${{ matrix.target }}
+    if: startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-24.04 }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm }
+          - { target: x86_64-apple-darwin, os: macos-26 }
+          - { target: aarch64-apple-darwin, os: macos-26 }
+          - { target: x86_64-pc-windows-msvc, os: windows-2025 }
+    runs-on: ${{ matrix.os }}
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: rustup target add "$TARGET"
+        shell: bash
+      - run: cargo build --release --locked -p arena-cli --target "$TARGET"
+        shell: bash
+      - name: Generate completions and man pages
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: '"target/$TARGET/release/arena" generate extras'
+
+  release-image:
+    name: release image ${{ matrix.target }}
+    if: startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [server, build-env]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          cache-from: type=gha,scope=${{ matrix.target }}
+
+  # The required check. It passes only if every job above passed or was skipped
+  # on purpose, so new jobs are enforced without changing branch protection.
+  sandbox:
+    name: sandbox verdicts (isolate in compose)
+    if: ${{ !cancelled() }}
+    needs: [deployment, smoke, judge, release-cli, release-image]
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for result in $RESULTS; do
+            case $result in
+              success | skipped) ;;
+              *) exit 1 ;;
+            esac
+          done
