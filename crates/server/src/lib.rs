@@ -42,6 +42,9 @@ const MAX_SUBMISSION_UPLOAD: usize = 96 * 1024 * 1024;
 pub enum Event {
     Public(ServerEvent),
     ForUser(i64, ServerEvent),
+    /// Some of this participant's tokens stopped working: their open
+    /// connections check theirs again.
+    Revoked(i64),
 }
 
 #[derive(Clone)]
@@ -62,6 +65,8 @@ pub struct AppState {
     login_limit: Arc<login_limit::LoginLimiter>,
     /// Requests per second from each address.
     request_limit: Arc<net_limit::RequestLimiter>,
+    /// Open WebSockets per participant and address.
+    ws_limit: Arc<net_limit::WebSocketLimiter>,
     /// Password hashes running at once.
     hash_slots: Arc<Semaphore>,
 }
@@ -80,6 +85,7 @@ impl AppState {
             latest_version: Arc::new(RwLock::new(None)),
             login_limit: Arc::default(),
             request_limit,
+            ws_limit: Arc::default(),
             hash_slots: Arc::new(Semaphore::new(accounts::MAX_PASSWORD_HASHES)),
         }
     }

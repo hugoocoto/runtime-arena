@@ -141,6 +141,10 @@ pub async fn upload(
     let memory_limit_kib = problem.memory_limit_kib as i64;
     let test_count = problem.tests.len() as i64;
     let updated_at = now();
+    // Submission intake reads the problem's version under this lock, so with it
+    // held, every submission either exists already (and is requeued below) or
+    // will read the new version: none is left judged against the old one.
+    let intake = state.submit_lock.lock().await;
     sqlx::query!(
         "INSERT INTO problems
             (slug, title, version, dir, time_limit_ms, memory_limit_kib, test_count, updated_at)
@@ -174,6 +178,7 @@ pub async fn upload(
         .execute(&state.db)
         .await?
         .rows_affected();
+        drop(intake);
         // Queued ones now point at the new version too; runs in progress are
         // dropped when they finish (see queue::record) and judged again.
         tracing::info!(%slug, requeued, "rejudging after problem change");

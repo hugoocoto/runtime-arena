@@ -51,6 +51,7 @@ impl TestServer {
             box_storage: None,
             update_check: false,
             rate_limit: 0,
+            trusted_proxies: Vec::new(),
         };
         change(&mut config);
         let db = open_db(&config.data_dir).await.unwrap();

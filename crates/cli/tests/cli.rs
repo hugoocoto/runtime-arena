@@ -69,6 +69,7 @@ async fn start_server(data: &Path) -> String {
         box_storage: None,
         update_check: false,
         rate_limit: 0,
+        trusted_proxies: Vec::new(),
     };
     let db = arena_server::open_db(data).await.unwrap();
     let state = AppState::new(db, config, Arc::new(FakeJudge));

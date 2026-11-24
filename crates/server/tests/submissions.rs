@@ -303,3 +303,52 @@ async fn extending_before_the_freeze_moves_it() {
     // Freeze is still 10 minutes before the (new) end, so not frozen now.
     assert!(!boards(&s, round, None).await[0].frozen);
 }
+
+#[tokio::test]
+async fn deleting_a_round_keeps_the_files_of_submissions_that_reuse_its_ids() {
+    let s = server().await;
+    let token = user(&s, "alice").await;
+    let first = start_round(&s, json!({})).await;
+    let old = submit(&s, &token, "AC").await;
+    wait_judged(&s, &token, old.id).await;
+    let (status, _) = s
+        .post(
+            &format!("/api/admin/rounds/{first}/stop"),
+            Some(ADMIN),
+            json!({}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    start_round(&s, json!({})).await;
+
+    let (status, body) = s
+        .request(
+            axum::http::Request::delete(format!("/api/admin/rounds/{first}"))
+                .header("authorization", format!("Bearer {ADMIN}"))
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let submissions = s.state.config.data_dir.join("submissions");
+    let left: Vec<_> = std::fs::read_dir(&submissions)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert!(left.is_empty(), "leftover files: {left:?}");
+
+    // SQLite gives the deleted id out again; the new submission's files are its own.
+    let new = submit(&s, &token, "AC").await;
+    assert_eq!(new.id, old.id, "the id is reused");
+    let (status, _) = s
+        .get(
+            &format!("/api/admin/submissions/{}/source", new.id),
+            Some(ADMIN),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        wait_judged(&s, &token, new.id).await.verdict,
+        Some(Verdict::Accepted)
+    );
+}

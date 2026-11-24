@@ -97,7 +97,15 @@ async fn run(state: &AppState, box_id: u32, job: &Job) -> Result<(), sqlx::Error
                 tracing::warn!(submission = job.id, error = %e, attempt, "retrying result write");
                 tokio::time::sleep(Duration::from_millis(200 * attempt)).await;
             }
-            Err(e) => return Err(e),
+            Err(e) => {
+                // Nothing else would ever move it on, so keep trying to mark it
+                // failed; the admin can rejudge it once the database recovers.
+                let error = format!("the result could not be stored: {e}");
+                if give_up(state, job, &error).await {
+                    publish_result(state, job).await;
+                }
+                return Err(e);
+            }
         }
     };
     if !recorded {
@@ -121,6 +129,21 @@ async fn run(state: &AppState, box_id: u32, job: &Job) -> Result<(), sqlx::Error
     // Even a rejected result can change a board (a rejudge may remove an entry).
     publish_board(state, job.round_id, job.problem_id).await;
     Ok(())
+}
+
+/// Tells the participant and the boards about a result stored outside `run`'s
+/// normal path.
+async fn publish_result(state: &AppState, job: &Job) {
+    match crate::submissions::find(state, job.id).await {
+        Ok((_, row)) => state.publish(Event::ForUser(
+            job.user_id,
+            ServerEvent::Submission {
+                submission: row.info(),
+            },
+        )),
+        Err(e) => tracing::error!(submission = job.id, error = %e.message, "cannot publish result"),
+    }
+    publish_board(state, job.round_id, job.problem_id).await;
 }
 
 /// Stores the outcome. Returns false when the submission was requeued (rejudged)
@@ -170,6 +193,43 @@ async fn record(
         }
     };
     Ok(updated.rows_affected() == 1)
+}
+
+/// Marks the submission failed, retrying until the database takes it. Returns
+/// false when it was requeued meanwhile, so it is no longer this run's. Holds
+/// this worker until then: while the database refuses writes it couldn't record
+/// other results either.
+async fn give_up(state: &AppState, job: &Job, error: &str) -> bool {
+    let verdict = verdict_str(Verdict::JudgeError);
+    let mut wait = Duration::from_secs(1);
+    loop {
+        let t = now();
+        let result = sqlx::query!(
+            "UPDATE submissions SET status = 'failed', verdict = ?, error = ?, judged_at = ?
+             WHERE id = ? AND status = 'judging' AND problem_version = ?",
+            verdict,
+            error,
+            t,
+            job.id,
+            job.problem_version
+        )
+        .execute(&state.db)
+        .await;
+        match result {
+            Ok(done) => {
+                let marked = done.rows_affected() == 1;
+                if marked {
+                    tracing::error!(submission = job.id, %error, "submission marked failed");
+                }
+                return marked;
+            }
+            Err(e) => {
+                tracing::error!(submission = job.id, error = %e, "cannot mark submission failed; retrying");
+                tokio::time::sleep(wait).await;
+                wait = (wait * 2).min(Duration::from_secs(30));
+            }
+        }
+    }
 }
 
 pub(crate) async fn publish_board(state: &AppState, round_id: i64, problem_id: i64) {

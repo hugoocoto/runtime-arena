@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE submissions SET status = 'failed', verdict = ?, error = ?, judged_at = ?\n             WHERE id = ? AND status = 'judging' AND problem_version = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "c8aa6c5612fcfd537201964218d9618c79148149206fb04afcdeaa868e5c2684"
+}

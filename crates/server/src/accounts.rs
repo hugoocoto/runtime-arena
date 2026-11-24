@@ -5,18 +5,19 @@ use arena_protocol::{LoginRequest, PasswordReset, SignupRequest, UserInfo, UserT
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use axum::Json;
-use axum::extract::{ConnectInfo, Path, State};
+use axum::extract::{Path, State};
 use axum::http::{Extensions, HeaderMap, StatusCode};
 use axum::response::Html;
 use std::net::{IpAddr, Ipv4Addr};
+use std::sync::LazyLock;
 use std::time::Duration;
 use subtle::ConstantTimeEq;
 use tokio::sync::OwnedSemaphorePermit;
 
 use crate::auth::{Admin, Participant, bearer_header, hash_token, new_token};
 use crate::error::{ApiError, ApiResult};
-use crate::net_limit::Peer;
-use crate::{AppState, now, valid_slug};
+use crate::net_limit::ClientIp;
+use crate::{AppState, Event, now, valid_slug};
 
 const MIN_PASSWORD: usize = 6;
 
@@ -33,12 +34,13 @@ fn too_many(what: &str, wait: Duration) -> ApiError {
     )
 }
 
-/// The connection's address. Forwarded-for headers are ignored on purpose: a
-/// client could set them to any value and escape the limit.
+/// The client's address, as [`crate::net_limit::limit_requests`] resolved it:
+/// `X-Forwarded-For` counts only from a trusted proxy, since a client could set
+/// it to any value and escape the limit.
 fn peer_ip(extensions: &Extensions) -> IpAddr {
     extensions
-        .get::<ConnectInfo<Peer>>()
-        .map_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED), |c| c.0.0.ip())
+        .get::<ClientIp>()
+        .map_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED), |c| c.0)
 }
 
 /// Hashes at once. Each takes about 19 MiB and a CPU core for a moment, so a
@@ -72,6 +74,16 @@ async fn hash_password(state: &AppState, password: String) -> ApiResult<String> 
     .map_err(ApiError::internal)?
     .map_err(ApiError::internal)
 }
+
+/// A hash no password is checked against for real. Names without a password
+/// are checked against it, so they take as long as real ones and the timing
+/// doesn't reveal which accounts exist.
+static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
+    Argon2::default()
+        .hash_password(b"no account has this password")
+        .map(|h| h.to_string())
+        .unwrap_or_default()
+});
 
 async fn verify_password(state: &AppState, password: String, hash: String) -> ApiResult<bool> {
     let slot = hash_slot(state).await?;
@@ -117,14 +129,7 @@ pub async fn signup(
         .begin_signup(ip)
         .map_err(|wait| too_many("sign-ups", wait))?;
     let hash = hash_password(&state, req.password).await?;
-    let user = crate::users::insert(&state, name, req.display_name).await?;
-    sqlx::query!(
-        "UPDATE users SET password_hash = ? WHERE name = ?",
-        hash,
-        user.name
-    )
-    .execute(&state.db)
-    .await?;
+    let user = crate::users::insert(&state, name, req.display_name, &hash).await?;
     let display_name =
         sqlx::query_scalar!("SELECT display_name FROM users WHERE name = ?", user.name)
             .fetch_one(&state.db)
@@ -155,6 +160,10 @@ pub async fn login(
         .fetch_optional(&state.db)
         .await?;
     let Some((id, Some(hash))) = row.map(|r| (r.id, r.password_hash)) else {
+        let dummy = tokio::task::spawn_blocking(|| DUMMY_HASH.clone())
+            .await
+            .map_err(ApiError::internal)?;
+        verify_password(&state, req.password, dummy).await?;
         return Err(wrong_login());
     };
     if !verify_password(&state, req.password, hash).await? {
@@ -177,7 +186,7 @@ pub async fn login(
 
 /// `POST /api/logout`: ends this device's session; other devices stay logged in.
 pub async fn logout(
-    _: Participant,
+    user: Participant,
     headers: HeaderMap,
     State(state): State<AppState>,
 ) -> ApiResult<StatusCode> {
@@ -186,6 +195,7 @@ pub async fn logout(
     sqlx::query!("DELETE FROM sessions WHERE token_hash = ?", hash)
         .execute(&state.db)
         .await?;
+    state.publish(Event::Revoked(user.id));
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -216,13 +226,14 @@ pub async fn reset_password(
     if updated.rows_affected() == 0 {
         return Err(ApiError::not_found(format!("no user {name}")));
     }
-    sqlx::query!(
-        "DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE name = ?)",
-        name
-    )
-    .execute(&mut *tx)
-    .await?;
+    let id = sqlx::query_scalar!("SELECT id FROM users WHERE name = ?", name)
+        .fetch_one(&mut *tx)
+        .await?;
+    sqlx::query!("DELETE FROM sessions WHERE user_id = ?", id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
+    state.publish(Event::Revoked(id));
     tracing::info!(user = %name, "password reset by the admin");
     Ok(Json(PasswordReset { name, password }))
 }

@@ -24,6 +24,10 @@ services:
       ARENA_DISK_MB: ${ARENA_DISK_MB:-512}
       ARENA_UPDATE_CHECK: ${ARENA_UPDATE_CHECK:-on}
       ARENA_RATE_LIMIT: ${ARENA_RATE_LIMIT:-200}
+      # Caddy reaches the server through the published port, so every
+      # connection comes from the container's gateway. Trusting it lets the
+      # limits count the participant's address from X-Forwarded-For instead.
+      ARENA_TRUSTED_PROXIES: ${ARENA_TRUSTED_PROXIES:-gateway}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - arena-data:/data
