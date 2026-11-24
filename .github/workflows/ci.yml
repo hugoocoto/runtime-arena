@@ -110,31 +110,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      # Layer caches are saved on main only; PRs read them.
-      # The programs are exported as files, so build-env is never loaded.
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      # Builds the sandbox programs and the server image in parallel; the targets,
+      # outputs and caches are in docker/ci-smoke.hcl. Set outputs per target
+      # there: the action's load/push inputs would override every target.
+      - uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         with:
-          context: .
-          file: docker/Dockerfile
-          target: sandbox-programs
-          outputs: type=local,dest=tests/sandbox/out
-          cache-from: type=gha,scope=build-env
-          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=build-env' || '' }}
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: docker/Dockerfile
-          target: server
-          tags: ghcr.io/${{ github.repository }}-server:latest
-          load: true
-          # Compile fast: these tests don't depend on the server being optimised.
-          # Its own cache scope keeps these layers apart from the release build.
-          build-args: |
-            CARGO_PROFILE_RELEASE_LTO=off
-            CARGO_PROFILE_RELEASE_OPT_LEVEL=0
-            CARGO_PROFILE_RELEASE_CODEGEN_UNITS=256
-          cache-from: type=gha,scope=server-ci
-          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=server-ci' || '' }}
+          # The checkout, not the action's default remote Git context.
+          source: .
+          files: docker/ci-smoke.hcl
       - run: ./scripts/sandbox-smoke.sh
         env:
           SKIP_BUILD: "1"
