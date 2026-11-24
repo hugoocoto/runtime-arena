@@ -10,6 +10,53 @@ pub struct ServerInfo {
     pub source_url: String,
 }
 
+/// Response of `GET /api/host`: the machine submissions run on, and how they are timed.
+/// Hardware fields are `None` (or empty) when the server could not read them.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HostInfo {
+    /// e.g. "x86_64".
+    pub arch: String,
+    /// e.g. "AMD Ryzen 7 5800X 8-Core Processor".
+    pub cpu_model: Option<String>,
+    /// Logical CPUs of the machine (not all of them judge).
+    pub cpus: Option<u32>,
+    /// x86-64 micro-architecture level (1 to 4): `-march=x86-64-vN` is safe up to this.
+    pub x86_64_level: Option<u8>,
+    /// Instruction set extensions useful for optimising, among those the CPU has.
+    pub cpu_flags: Vec<String>,
+    /// Caches of the first judging CPU.
+    pub caches: Vec<CacheInfo>,
+    /// Total memory of the machine, in KiB.
+    pub memory_kib: Option<u64>,
+    /// Kernel release, e.g. "6.8.0-45-generic".
+    pub kernel: Option<String>,
+    pub judge: JudgeSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CacheInfo {
+    /// 1, 2 or 3.
+    pub level: u8,
+    /// "data", "instruction" or "unified".
+    pub kind: String,
+    pub size_kib: u64,
+}
+
+/// The judging rules that affect a submission's measured time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct JudgeSettings {
+    /// Submissions judged at the same time, each in its own sandbox.
+    pub workers: u32,
+    /// Times each test runs; every run must pass, and the best time and memory count.
+    pub runs_per_test: u32,
+    /// Processes and threads one submission may create.
+    pub processes: u32,
+    /// Judging stops after this many failing tests (0: all tests run).
+    pub max_failures: u32,
+    /// CPU time is measured in microseconds from cgroups, not isolate's milliseconds.
+    pub microsecond_timing: bool,
+}
+
 /// Response of `GET /api/admin/update`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpdateInfo {

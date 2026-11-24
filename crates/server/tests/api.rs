@@ -2,7 +2,7 @@
 
 mod common;
 
-use arena_protocol::{ProblemStatement, ProblemSummary, RoundInfo, RoundState, UserInfo};
+use arena_protocol::{HostInfo, ProblemStatement, ProblemSummary, RoundInfo, RoundState, UserInfo};
 use axum::http::StatusCode;
 use common::{ADMIN, TestServer};
 use serde_json::json;
@@ -16,6 +16,36 @@ async fn admin_endpoints_require_the_admin_token() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     let (status, _) = s.get("/api/admin/users", Some(ADMIN)).await;
     assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn host_specs_need_a_login_and_report_the_judge_settings() {
+    let s = TestServer::with_config(|c| {
+        c.judge_boxes = vec![0, 1];
+        c.runs_per_test = 5;
+        c.processes = 8;
+        c.max_failures = 0;
+        c.cg_root = "/nonexistent".into();
+    })
+    .await;
+    assert_eq!(s.get("/api/host", None).await.0, StatusCode::UNAUTHORIZED);
+    let alice = s.participant("alice").await;
+    for token in [alice.as_str(), ADMIN] {
+        let (status, body) = s.get("/api/host", Some(token)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let host: HostInfo = serde_json::from_value(body).unwrap();
+        assert_eq!(host.arch, std::env::consts::ARCH);
+        assert_eq!(
+            (
+                host.judge.workers,
+                host.judge.runs_per_test,
+                host.judge.processes
+            ),
+            (2, 5, 8)
+        );
+        assert_eq!(host.judge.max_failures, 0);
+        assert!(!host.judge.microsecond_timing);
+    }
 }
 
 #[tokio::test]

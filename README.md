@@ -197,6 +197,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena logout` | Log out of this device |
 | `arena whoami` | Show the current account and server |
 | `arena round` | Show the round, its problems and time left |
+| `arena specs` | Show the judge machine (CPU, caches, memory) and how runs are timed |
 | `arena problem <slug> [--samples <dir>]` | Show a statement and save samples |
 | `arena pull` | Download the build image ahead of time (Docker) |
 | `arena build -- <command>` | Build in the judge's environment (Docker) |

@@ -75,6 +75,11 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Show the judge machine (CPU, caches, memory) and how submissions are timed.
+    Specs {
+        #[arg(long)]
+        json: bool,
+    },
     /// Show a problem's statement and samples.
     Problem {
         slug: Option<String>,
