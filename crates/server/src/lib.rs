@@ -6,6 +6,7 @@ pub mod backend;
 mod boards;
 pub mod config;
 pub mod error;
+mod host;
 mod login_limit;
 pub mod net_limit;
 mod problems;
@@ -156,6 +157,7 @@ pub fn app(state: AppState) -> Router {
         .route("/healthz", get(|| async { "ok" }))
         .route("/ws", get(ws::handler))
         .route("/api/info", get(info))
+        .route("/api/host", get(host::info))
         .route("/api/me", get(users::me))
         .route("/api/signup", post(accounts::signup))
         .route("/api/login", post(accounts::login))

@@ -79,6 +79,7 @@ async fn run(cli: Cli) -> Result<bool> {
         | Command::Generate { .. } => unreachable!("handled above"),
         Command::Whoami { json } => participant::whoami(&config, json).await?,
         Command::Round { json } => participant::round(&config, json).await?,
+        Command::Specs { json } => participant::specs(&config, json).await?,
         Command::Problem {
             slug,
             samples,

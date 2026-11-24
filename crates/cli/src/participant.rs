@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use arena_protocol::{
-    LoginRequest, ProblemStatement, RoundInfo, RoundState, ServerEvent, ServerInfo, SignupRequest,
-    SubmissionInfo, SubmissionStatus, UserInfo, UserToken, Verdict,
+    HostInfo, LoginRequest, ProblemStatement, RoundInfo, RoundState, ServerEvent, ServerInfo,
+    SignupRequest, SubmissionInfo, SubmissionStatus, UserInfo, UserToken, Verdict,
 };
 
 use crate::ask;
@@ -382,6 +382,93 @@ pub async fn whoami(config: &Config, json: bool) -> Result<()> {
     Ok(())
 }
 
+pub async fn specs(config: &Config, json: bool) -> Result<()> {
+    let client = participant(config)?;
+    let host: HostInfo = client.get("/api/host").await?;
+    if json {
+        return format::print_json(&host);
+    }
+    print!("{}", render_specs(&host, client.base()));
+    Ok(())
+}
+
+/// The `arena specs` text.
+fn render_specs(h: &HostInfo, server: &str) -> String {
+    let mut out = format!("Judge machine of {server}\n");
+    let mut row = |label: &str, value: String| out.push_str(&format!("  {label:<8} {value}\n"));
+    let mut cpu = h.cpu_model.clone().unwrap_or_else(|| "unknown".to_owned());
+    match h.cpus {
+        Some(n) => cpu.push_str(&format!(" ({n} logical CPUs, {})", h.arch)),
+        None => cpu.push_str(&format!(" ({})", h.arch)),
+    }
+    row("CPU", cpu);
+    if let Some(level) = h.x86_64_level {
+        row(
+            "Target",
+            format!("x86-64-v{level} (safe to build with -march=x86-64-v{level})"),
+        );
+    }
+    if !h.cpu_flags.is_empty() {
+        row("Flags", h.cpu_flags.join(" "));
+    }
+    if !h.caches.is_empty() {
+        let caches: Vec<String> = h
+            .caches
+            .iter()
+            .map(|c| {
+                let suffix = match c.kind.as_str() {
+                    "data" => "d",
+                    "instruction" => "i",
+                    _ => "",
+                };
+                format!("L{}{suffix} {}", c.level, format::memory(c.size_kib))
+            })
+            .collect();
+        row("Caches", caches.join(", "));
+    }
+    if let Some(kib) = h.memory_kib {
+        row(
+            "Memory",
+            format!(
+                "{:.1} GiB in total; each problem sets its own limit",
+                kib as f64 / (1024.0 * 1024.0)
+            ),
+        );
+    }
+    if let Some(kernel) = &h.kernel {
+        row("Kernel", format!("Linux {kernel}"));
+    }
+    let j = &h.judge;
+    out.push_str("Judging\n");
+    let mut line = |s: String| out.push_str(&format!("  {s}\n"));
+    line(match j.workers {
+        1 => "one submission at a time".to_owned(),
+        n => format!("{n} submissions at a time, each in its own sandbox"),
+    });
+    line(match j.runs_per_test {
+        1 => "each test runs once".to_owned(),
+        n => format!(
+            "each test runs {n} times and must pass every run; the best time and memory count"
+        ),
+    });
+    line(format!(
+        "time is CPU time of all processes and threads, measured in {}",
+        if j.microsecond_timing {
+            "microseconds"
+        } else {
+            "milliseconds"
+        }
+    ));
+    line(format!("up to {} processes and threads", j.processes));
+    if j.max_failures > 0 {
+        line(format!(
+            "judging stops after {} failed tests",
+            j.max_failures
+        ));
+    }
+    out
+}
+
 pub fn print_round(round: &RoundInfo) {
     let now = format::now();
     let when = match round.state {
@@ -729,6 +816,71 @@ fn id_flag(flag: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arena_protocol::{CacheInfo, JudgeSettings};
+
+    #[test]
+    fn specs_show_hardware_and_judging_rules() {
+        let host = HostInfo {
+            arch: "x86_64".into(),
+            cpu_model: Some("AMD Ryzen 7 5800X 8-Core Processor".into()),
+            cpus: Some(16),
+            x86_64_level: Some(3),
+            cpu_flags: vec!["avx2".into(), "bmi2".into()],
+            caches: vec![
+                CacheInfo {
+                    level: 1,
+                    kind: "data".into(),
+                    size_kib: 32,
+                },
+                CacheInfo {
+                    level: 3,
+                    kind: "unified".into(),
+                    size_kib: 32 * 1024,
+                },
+            ],
+            memory_kib: Some(32 * 1024 * 1024),
+            kernel: Some("6.8.0".into()),
+            judge: JudgeSettings {
+                workers: 2,
+                runs_per_test: 3,
+                processes: 64,
+                max_failures: 0,
+                microsecond_timing: true,
+            },
+        };
+        let text = render_specs(&host, "https://arena.local");
+        for expected in [
+            "AMD Ryzen 7 5800X 8-Core Processor (16 logical CPUs, x86_64)",
+            "-march=x86-64-v3",
+            "avx2 bmi2",
+            "L1d 32 KiB, L3 32 MiB",
+            "32.0 GiB",
+            "Linux 6.8.0",
+            "2 submissions at a time",
+            "best time",
+            "microseconds",
+        ] {
+            assert!(text.contains(expected), "missing {expected:?} in:\n{text}");
+        }
+        assert!(!text.contains("stops after"), "{text}");
+
+        let bare = HostInfo {
+            cpu_model: None,
+            cpus: None,
+            x86_64_level: None,
+            cpu_flags: vec![],
+            caches: vec![],
+            memory_kib: None,
+            kernel: None,
+            ..host
+        };
+        let text = render_specs(&bare, "https://arena.local");
+        assert!(text.contains("unknown (x86_64)"), "{text}");
+        assert!(
+            !text.contains("Caches") && !text.contains("Memory"),
+            "{text}"
+        );
+    }
 
     fn vars<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
         |k| {
