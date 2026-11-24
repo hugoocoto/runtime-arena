@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/hugoocoto/runtime-arena/compare/v0.10.0...v0.11.0) (2026-11-24)
+
+
+### Features
+
+* **cli:** add pull command to fetch the build image ([#29](https://github.com/hugoocoto/runtime-arena/issues/29)) ([fdac484](https://github.com/hugoocoto/runtime-arena/commit/fdac484fd9affe9b580fbbe67b00502b93fdef42))
+* **cli:** add specs command showing the judge machine ([#32](https://github.com/hugoocoto/runtime-arena/issues/32)) ([47d27d0](https://github.com/hugoocoto/runtime-arena/commit/47d27d076923a37693fd82c9ca19cd08a08cd9b5))
+
 ## [0.10.0](https://github.com/hugoocoto/runtime-arena/compare/v0.9.1...v0.10.0) (2026-11-22)
 
 
