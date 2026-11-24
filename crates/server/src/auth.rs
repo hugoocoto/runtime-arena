@@ -81,7 +81,10 @@ pub(crate) async fn participant_from_headers(
 }
 
 /// The participant owning `token`: their admin-issued token, or a login session.
-async fn find_by_token(state: &AppState, token: &str) -> Result<Option<Participant>, ApiError> {
+pub(crate) async fn find_by_token(
+    state: &AppState,
+    token: &str,
+) -> Result<Option<Participant>, ApiError> {
     let hash = hash_token(token);
     Ok(sqlx::query_as!(
         Participant,

@@ -274,6 +274,7 @@ Set these in `.env`. [`.env.example`](.env.example) documents each one.
 | `ARENA_DISK_MB` | `512` | Disk space per sandbox |
 | `ARENA_PORT` | `8080` | Local-only port for the admin CLI |
 | `ARENA_RATE_LIMIT` | `200` | Requests per second per address, `0` disables |
+| `ARENA_TRUSTED_PROXIES` | `gateway` | Proxies whose `X-Forwarded-For` names the client (Caddy, through the Docker host) |
 | `ARENA_SERVER` | local | Server for `arena login --admin` from another machine |
 | `ARENA_UPDATE_CHECK` | `on` | Check GitHub for new releases. Never auto-installs |
 | `RUST_LOG` | `info` | Server log level |

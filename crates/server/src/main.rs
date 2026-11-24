@@ -36,13 +36,14 @@ async fn main() {
             ..JudgeConfig::default()
         },
     });
+    let trusted_proxies = config.trusted_proxies.clone();
     let state = AppState::new(db, config, judge);
     if let Err(e) = start_background(&state).await {
         panic!("cannot start judge workers: {e}");
     }
     // The peer address is what the rate limits count by.
     axum::serve(
-        LimitedListener::new(listener),
+        LimitedListener::new(listener, trusted_proxies),
         app(state).into_make_service_with_connect_info::<Peer>(),
     )
     .with_graceful_shutdown(shutdown_signal())

@@ -25,12 +25,14 @@ pub async fn list(_: Admin, State(state): State<AppState>) -> ApiResult<Json<Vec
     Ok(Json(users))
 }
 
-/// Creates a participant for sign-up. The account token is never handed out:
-/// devices authenticate with the session tokens from `/api/login`.
+/// Creates a participant for sign-up, with their password in the same statement
+/// so a failure can't leave an account without one. The account token is never
+/// handed out: devices authenticate with the session tokens from `/api/login`.
 pub(crate) async fn insert(
     state: &AppState,
     name: String,
     display_name: Option<String>,
+    password_hash: &str,
 ) -> ApiResult<UserToken> {
     if !valid_slug(&name) {
         return Err(ApiError::bad_request(
@@ -45,11 +47,13 @@ pub(crate) async fn insert(
     let hash = hash_token(&token);
     let created_at = now();
     let inserted = sqlx::query!(
-        "INSERT INTO users (name, display_name, token_hash, created_at) VALUES (?, ?, ?, ?)
+        "INSERT INTO users (name, display_name, token_hash, password_hash, created_at)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (name) DO NOTHING",
         name,
         display_name,
         hash,
+        password_hash,
         created_at
     )
     .execute(&state.db)

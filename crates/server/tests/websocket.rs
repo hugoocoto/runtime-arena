@@ -5,6 +5,8 @@ mod common;
 use std::time::Duration;
 
 use arena_protocol::{ServerEvent, Verdict};
+use arena_server::Event;
+use axum::http::StatusCode;
 use common::{ADMIN, TestServer, fake_solution};
 use futures_util::StreamExt;
 use serde_json::json;
@@ -168,4 +170,91 @@ async fn new_connections_get_a_snapshot_and_bad_tokens_are_refused() {
         Err(WsError::Http(resp)) => assert_eq!(resp.status(), 401),
         other => panic!("expected 401, got {other:?}"),
     }
+}
+
+/// Waits for the server to close the connection.
+async fn closed(ws: &mut Ws) {
+    loop {
+        match tokio::time::timeout(Duration::from_secs(5), ws.next())
+            .await
+            .expect("the connection stayed open")
+        {
+            None | Some(Err(_)) | Some(Ok(Message::Close(_))) => return,
+            Some(Ok(_)) => {}
+        }
+    }
+}
+
+#[tokio::test]
+async fn revoked_tokens_close_their_open_connections() {
+    let s = TestServer::new().await;
+    let first = s.participant("alice").await;
+    let (_, body) = s
+        .post(
+            "/api/login",
+            None,
+            json!({"name": "alice", "password": "secret1"}),
+        )
+        .await;
+    let second = body["token"].as_str().unwrap().to_owned();
+    let url = listen(&s).await;
+    let mut a = connect(&url, Some(&first)).await.unwrap();
+    let mut b = connect(&url, Some(&second)).await.unwrap();
+    next(&mut a).await; // hello
+    next(&mut b).await;
+
+    // Logging out ends that device's connection only.
+    let (status, _) = s.post("/api/logout", Some(&first), json!({})).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    closed(&mut a).await;
+    s.state
+        .events
+        .send(Event::Public(ServerEvent::Hello { user: None }))
+        .unwrap();
+    assert!(matches!(next(&mut b).await, ServerEvent::Hello { .. }));
+
+    // A password reset ends all of them.
+    let (status, _) = s
+        .post("/api/admin/users/alice/password", Some(ADMIN), json!({}))
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    closed(&mut b).await;
+}
+
+#[tokio::test]
+async fn a_connection_that_falls_behind_is_closed_to_resync() {
+    let s = TestServer::new().await;
+    let url = listen(&s).await;
+    let mut ws = connect(&url, None).await.unwrap();
+    next(&mut ws).await; // hello; no round, so no snapshot follows
+    // No await in between: the connection can't keep up and lags.
+    for _ in 0..2000 {
+        s.state
+            .events
+            .send(Event::Public(ServerEvent::Hello { user: None }))
+            .unwrap();
+    }
+    closed(&mut ws).await;
+}
+
+#[tokio::test]
+async fn one_participant_cannot_hold_unlimited_connections() {
+    let s = TestServer::new().await;
+    let token = s.participant("alice").await;
+    let url = listen(&s).await;
+    let mut held = Vec::new();
+    loop {
+        match connect(&url, Some(&token)).await {
+            Ok(ws) => held.push(ws),
+            Err(WsError::Http(resp)) => {
+                assert_eq!(resp.status(), 429);
+                break;
+            }
+            Err(e) => panic!("{e}"),
+        }
+        assert!(held.len() <= 64, "no limit");
+    }
+    assert_eq!(held.len(), 16);
+    // Anonymous viewers are counted separately.
+    connect(&url, None).await.unwrap();
 }

@@ -19,7 +19,8 @@ const MAX_PER_ADDRESS: u32 = 100;
 /// Accounts one address may try to create, per window.
 const MAX_SIGNUPS_PER_ADDRESS: u32 = 300;
 const WINDOW: Duration = Duration::from_secs(15 * 60);
-/// Bounds memory if many addresses attack at once.
+/// Bounds memory if many addresses attack at once. Once it is full, new keys
+/// are let through untracked rather than refused.
 const MAX_ENTRIES: usize = 100_000;
 const PRUNE_EVERY: Duration = Duration::from_secs(60);
 
@@ -84,7 +85,10 @@ impl Entries {
             return Ok(());
         }
         if self.map.len() >= MAX_ENTRIES {
-            return Err(PRUNE_EVERY);
+            // Refusing here would let anyone with enough addresses fill the
+            // table and lock everyone out. Keys already tracked stay limited,
+            // and password checks are still capped by the hash slots.
+            return Ok(());
         }
         self.map.insert(
             key,
@@ -265,6 +269,30 @@ mod tests {
             l.begin_at("dana", ip(1), now).is_ok(),
             "logins are separate"
         );
+    }
+
+    #[test]
+    fn a_full_table_lets_new_keys_through_but_keeps_known_ones_limited() {
+        let l = LoginLimiter::default();
+        let now = Instant::now();
+        for _ in 0..MAX_PER_ACCOUNT {
+            l.begin_at("dana", ip(1), now).unwrap();
+        }
+        {
+            let mut entries = l.entries.lock().unwrap();
+            for i in 0..MAX_ENTRIES as u32 {
+                let filler = IpAddr::from(std::net::Ipv4Addr::from(0x0b00_0000 + i));
+                entries.map.insert(
+                    Key::Address(filler),
+                    Entry {
+                        count: 1,
+                        resets_at: now + WINDOW,
+                    },
+                );
+            }
+        }
+        assert!(l.begin_at("erin", ip(2), now).is_ok(), "a newcomer gets in");
+        assert!(l.begin_at("dana", ip(1), now).is_err(), "still locked");
     }
 
     #[test]

@@ -152,6 +152,49 @@ async fn repeated_failed_logins_are_refused_per_address() {
 }
 
 #[tokio::test]
+async fn behind_a_trusted_proxy_logins_are_limited_per_client() {
+    use axum::body::Body;
+    use axum::extract::ConnectInfo;
+    use axum::http::{Request, header};
+
+    let proxy = arena_server::net_limit::IpRange::parse("10.0.0.9").unwrap();
+    let s = TestServer::with_config(|c| c.trusted_proxies = vec![proxy]).await;
+    s.participant("alice").await;
+    // Every request comes from the proxy, which names the client.
+    let attempt = |client: &str, password: &str| {
+        let body = json!({"name": "alice", "password": password}).to_string();
+        let mut req = Request::post("/api/login")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("x-forwarded-for", client)
+            .body(Body::from(body))
+            .unwrap();
+        let peer = arena_server::net_limit::Peer(std::net::SocketAddr::from(([10, 0, 0, 9], 4000)));
+        req.extensions_mut().insert(ConnectInfo(peer));
+        req
+    };
+    for _ in 0..10 {
+        let (status, _) = s.request(attempt("198.51.100.1", "wrong!")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+    assert_eq!(
+        s.request(attempt("198.51.100.1", "wrong!")).await.0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    // A stranger failing on purpose doesn't lock the owner out...
+    assert_eq!(
+        s.request(attempt("198.51.100.2", "secret1")).await.0,
+        StatusCode::OK
+    );
+    // ...and can't escape the limit by naming another address before the proxy's.
+    assert_eq!(
+        s.request(attempt("198.51.100.3, 198.51.100.1", "wrong!"))
+            .await
+            .0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+}
+
+#[tokio::test]
 async fn repeated_wrong_event_codes_are_refused_per_address() {
     use axum::body::Body;
     use axum::extract::ConnectInfo;

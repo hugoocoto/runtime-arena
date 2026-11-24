@@ -262,12 +262,12 @@ pub async fn remove(
         ));
     }
 
+    let mut tx = state.db.begin().await?;
     let submission_ids: Vec<i64> =
         sqlx::query_scalar("SELECT id FROM submissions WHERE round_id = ?")
             .bind(id)
-            .fetch_all(&state.db)
+            .fetch_all(&mut *tx)
             .await?;
-    let mut tx = state.db.begin().await?;
     sqlx::query("DELETE FROM submissions WHERE round_id = ?")
         .bind(id)
         .execute(&mut *tx)
@@ -280,17 +280,50 @@ pub async fn remove(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    tx.commit().await?;
+    // SQLite hands the ids of deleted rows out again once they are the highest,
+    // so a new submission may get one of these ids as soon as this commits. Move
+    // the files aside first: afterwards, `submissions/{id}` may be someone else's.
+    let moved = move_aside(&state, &submission_ids).await;
+    if let Err(e) = tx.commit().await {
+        for (from, to) in &moved {
+            if let Err(error) = tokio::fs::rename(to, from).await {
+                tracing::error!(dir = %from.display(), %error, "could not restore submission files");
+            }
+        }
+        return Err(e.into());
+    }
 
-    for submission_id in submission_ids {
-        if let Err(error) =
-            tokio::fs::remove_dir_all(crate::submissions::dir(&state, submission_id)).await
-        {
-            tracing::warn!(submission = submission_id, %error, "could not remove submission files");
+    for (_, trash) in moved {
+        if let Err(error) = tokio::fs::remove_dir_all(&trash).await {
+            tracing::warn!(dir = %trash.display(), %error, "could not remove submission files");
         }
     }
     tracing::info!(round = id, "round removed");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Renames each submission's directory to a name no submission uses, returning
+/// (original, new) pairs. Missing directories are skipped.
+async fn move_aside(
+    state: &AppState,
+    submission_ids: &[i64],
+) -> Vec<(std::path::PathBuf, std::path::PathBuf)> {
+    let mut moved = Vec::new();
+    for &submission_id in submission_ids {
+        let from = crate::submissions::dir(state, submission_id);
+        let to = from.with_file_name(format!(
+            ".removed-{submission_id}-{}",
+            crate::auth::new_token()
+        ));
+        match tokio::fs::rename(&from, &to).await {
+            Ok(()) => moved.push((from, to)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                tracing::warn!(submission = submission_id, %error, "could not move submission files aside");
+            }
+        }
+    }
+    moved
 }
 
 /// `POST /api/admin/rounds/{id}/start`: starts the clock. Only one round may run at a time.
