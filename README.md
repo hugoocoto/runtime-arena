@@ -283,6 +283,7 @@ Set these in `.env`. [`.env.example`](.env.example) documents each one.
 cargo build && cargo test
 scripts/sandbox-smoke.sh   # sandbox verdicts (needs Docker)
 scripts/judge-tests.sh     # judge tests against real isolate (needs Docker)
+scripts/e2e.sh             # short contest on the real server image (needs Docker)
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
