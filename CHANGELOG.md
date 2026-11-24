@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/hugoocoto/runtime-arena/compare/v0.11.0...v0.11.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **server:** harden limits, websockets and judging found in review ([#34](https://github.com/hugoocoto/runtime-arena/issues/34)) ([9c79b04](https://github.com/hugoocoto/runtime-arena/commit/9c79b0405b2b8677f8c3a56df0c89c505fdfe3b8))
+
 ## [0.11.0](https://github.com/hugoocoto/runtime-arena/compare/v0.10.0...v0.11.0) (2026-11-24)
 
 
