@@ -95,8 +95,7 @@ pub(crate) async fn latest(state: &AppState) -> ApiResult<Option<RoundRow>> {
 }
 
 /// The round accepting submissions right now, if any.
-pub(crate) async fn running(state: &AppState) -> ApiResult<Option<RoundRow>> {
-    let t = now();
+pub(crate) async fn running(state: &AppState, t: i64) -> ApiResult<Option<RoundRow>> {
     Ok(latest(state)
         .await?
         .filter(|r| r.state(t) == RoundState::Running))
@@ -238,6 +237,37 @@ pub async fn create(
     Ok(Json(info(&state, find_row(&state, id).await?, true).await?))
 }
 
+/// `POST /api/admin/rounds/{id}/clone`: copy the settings and problems to a draft.
+pub async fn clone_round(
+    _: Admin,
+    State(state): State<AppState>,
+    Path(source_id): Path<i64>,
+) -> ApiResult<Json<RoundInfo>> {
+    let mut tx = state.db.begin().await?;
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO rounds (name, duration_s, freeze_s, cooldown_s, created_at)
+         SELECT name, duration_s, freeze_s, cooldown_s, ? FROM rounds WHERE id = ?
+         RETURNING id",
+    )
+    .bind(now())
+    .bind(source_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| ApiError::not_found(format!("no round {source_id}")))?;
+    sqlx::query(
+        "INSERT INTO round_problems (round_id, problem_id, position)
+         SELECT ?, problem_id, position FROM round_problems WHERE round_id = ?",
+    )
+    .bind(id)
+    .bind(source_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    tracing::info!(round = id, source_round = source_id, "round cloned");
+    Ok(Json(info(&state, find_row(&state, id).await?, true).await?))
+}
+
 /// `DELETE /api/admin/rounds/{id}`: removes a draft or finished round.
 pub async fn remove(
     _: Admin,
@@ -332,6 +362,25 @@ pub async fn start(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> ApiResult<Json<RoundInfo>> {
+    // Keep the checked version stable until the round is marked as started.
+    let uploads = state.upload_lock.lock().await;
+    let round = find_row(&state, id).await?;
+    if round.started_at.is_some() {
+        return Err(ApiError::conflict(format!(
+            "round {id} has already started"
+        )));
+    }
+    let entries = problems(&state, id).await?;
+    let preflight_state = state.clone();
+    tokio::task::spawn_blocking(move || -> ApiResult<()> {
+        for problem in entries {
+            problem.validate_public_material(&preflight_state)?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(ApiError::internal)??;
+
     let t = now();
     let mut tx = state.db.begin().await?;
     let running = sqlx::query_scalar!(
@@ -358,6 +407,7 @@ pub async fn start(
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
+    drop(uploads);
     if updated.rows_affected() == 0 {
         let round = find_row(&state, id).await?;
         return Err(ApiError::conflict(format!(

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO submission_refusals\n             (user_id, problem, reason, client_at, received_at, refused_at)\n             VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "70738bfdb998cf605666ec3d3c82053ab28bf6efc87afcab1004f18a3d467c1f"
+}

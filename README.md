@@ -68,6 +68,11 @@ arena build -- env ZIG_GLOBAL_CACHE_DIR=.zig-cache zig build-exe solution.zig -O
 arena submit sum sol --src solution.c
 ```
 
+When `--src` points to a directory, the CLI skips the submitted executable and
+recognizable ELF, Mach-O, and PE binaries. It prints the file count, archive size,
+and largest included files on stderr before uploading. To submit a script that is
+also your entire source, point `--src` directly at the script.
+
 After you sign in, `arena build` and `arena pull` use the architecture reported by
 `arena specs`. The build image is available for Linux AMD64 and ARM64. With no
 configured server the CLI defaults to AMD64. Use `--platform linux/amd64` or
@@ -151,6 +156,42 @@ and import it into that machine's trusted root certificates:
 docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt arena-local-ca.crt
 ```
 
+For `arena trust`, give participants the SHA-256 fingerprint through a trusted
+channel. Use the hex value printed after `Fingerprint=`. The fingerprint hashes
+the certificate’s DER encoding, so it matches OpenSSL and browser tools.
+
+```sh
+openssl x509 -in arena-local-ca.crt -noout -fingerprint -sha256
+arena trust https://<server> --fingerprint "$FINGERPRINT"
+```
+
+By default, the CLI fetches `/arena-ca.crt` over HTTP on the same host and
+explicit port as the HTTPS address. If the address has no port, it uses port 80
+for the download. If that route is unavailable, give the participants the
+exported PEM certificate through a trusted channel and use it directly. This
+works with HTTPS on any port and with an existing reverse proxy.
+
+```sh
+arena trust https://<server> --ca-file arena-local-ca.crt --fingerprint "$FINGERPRINT"
+```
+
+To serve the CA from an existing Caddy instance, add a handler to the applicable
+HTTP site block. Keep only the exported public certificate in the directory
+served by this handler.
+
+```caddyfile
+http://arena.local {
+    handle /arena-ca.crt {
+        root * /srv/arena-ca
+        rewrite * /arena-local-ca.crt
+        file_server
+    }
+    handle {
+        redir https://arena.local{uri} permanent
+    }
+}
+```
+
 ### 2. Run a round
 
 Run these from the repository directory on the host:
@@ -164,6 +205,21 @@ arena admin round start 1
 
 Open `https://<domain>/` on the projector. Announce `https://<domain>/join` and
 the event code.
+
+### Keep private problem packages on the judge side
+
+- Keep problem packages, test generators, checkers, and expected outputs on the
+  organizer or judge machine. Give each contestant a clean working directory
+  outside the organizer’s checkout. On shared hardware, use separate accounts
+  or isolated environments with no access to the private workspace or server
+  data volume.
+- Before the round, run `arena admin round export 1` as the organizer. The
+  archive contains `manifest.json` with limits, `<slug>/statement.md`, and
+  `<slug>/samples/<name>.in` and `.out` for the declared public samples.
+  Keep the archive private until the scheduled reveal, then distribute it
+  from a location accessible to contestants.
+- If `arena problem <slug>` fails during a round, contestants should report
+  the slug and error to the organizer and use the public bundle if available.
 
 ### Before the event
 
@@ -199,7 +255,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 
 | Command | Purpose |
 |---|---|
-| `arena trust <server>` | Trust a LAN server's certificate |
+| `arena trust <server> [--fingerprint <sha256>] [--ca-file <pem>]` | Trust a LAN server’s CA |
 | `arena signup [server]` | Create an account and log in |
 | `arena login [server]` | Log in on this device |
 | `arena logout` | Log out of this device |
@@ -211,7 +267,8 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena build -- <command>` | Build in the judge's environment (Docker) |
 | `arena submit <problem> <executable> --src <path>` | Submit and follow judging |
 | `arena submissions [id]` | List your submissions or show one |
-| `arena board` | Open the live leaderboards |
+| `arena submissions --json --refused` | Show your server-refused submission attempts, with reason codes and Unix timestamps |
+| `arena board [--once\|--json]` | Open the live leaderboards, or print a snapshot |
 | `arena completions <shell>` | Print a shell completion script |
 
 ### Organisers
@@ -224,6 +281,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena admin problem list` | List problems |
 | `arena admin round create [--name] [--minutes] [--freeze] [--cooldown] <problems...>` | Create a round |
 | `arena admin round list` | List rounds |
+| `arena admin round clone <id>` | Copy a round’s settings and problem order to a new draft. Start it with `arena admin round start <new-id>` |
 | `arena admin round start\|stop <id>` | Start or end a round |
 | `arena admin round extend <id> <minutes>` | Add time to a running round |
 | `arena admin round delete <id>` | Delete a draft or finished round and its submissions |
@@ -254,6 +312,10 @@ memory_limit_mb = 256
 samples = ["01"]       # tests shown to participants
 # checker = "check.sh" # optional
 ```
+
+Include a readable UTF-8 statement and both input and output files for every
+declared sample. The server checks these files on upload and before starting a
+round.
 
 Output is compared token by token unless you set a `checker`. It runs as
 `checker input output answer`, and exit code 0 accepts. See

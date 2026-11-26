@@ -19,8 +19,19 @@ async fn main() -> ExitCode {
 async fn run(cli: Cli) -> Result<bool> {
     // These work without a saved configuration.
     let command = match cli.command {
-        Command::Trust { server, yes } => {
-            participant::trust(server.as_deref(), yes).await?;
+        Command::Trust {
+            server,
+            fingerprint,
+            ca_file,
+            yes,
+        } => {
+            participant::trust(
+                server.as_deref(),
+                fingerprint.as_deref(),
+                ca_file.as_deref(),
+                yes,
+            )
+            .await?;
             return Ok(true);
         }
         Command::Signup {
@@ -105,14 +116,24 @@ async fn run(cli: Cli) -> Result<bool> {
             let src = ask::path("Source file or directory", "--src", src)?;
             return participant::submit(&config, &problem, &executable, &src, !no_wait).await;
         }
-        Command::Submissions { id, json } => participant::submissions(&config, id, json).await?,
-        Command::Board => {
+        Command::Submissions { id, json, refused } => {
+            if refused {
+                participant::submission_refusals(&config).await?;
+            } else {
+                participant::submissions(&config, id, json).await?;
+            }
+        }
+        Command::Board { once, json } => {
             let client = Client::with_ca(
                 config.server()?,
                 config.token.clone(),
                 config.ca_certificate.as_deref(),
             )?;
-            board::run(client, config.token.is_some()).await?
+            if json || once {
+                board::snapshot(&client, config.token.is_some(), json).await?
+            } else {
+                board::run(client, config.token.is_some()).await?
+            }
         }
         Command::Admin { command } => {
             let c = admin::admin(&config)?;
@@ -169,6 +190,15 @@ async fn run(cli: Cli) -> Result<bool> {
                 }
                 AdminCommand::Round(RoundCommand::List { json }) => {
                     admin::round_list(&c, json).await?
+                }
+                AdminCommand::Round(RoundCommand::Export { id, output }) => {
+                    let out =
+                        output.unwrap_or_else(|| format!("round-{id}-materials.tar.gz").into());
+                    admin::round_export(&c, id, &out).await?;
+                }
+                AdminCommand::Round(RoundCommand::Clone { id }) => {
+                    let id = round_id(&c, id).await?;
+                    admin::round_action(&c, id, "clone", None).await?
                 }
                 AdminCommand::Round(RoundCommand::Start { id }) => {
                     let id = round_id(&c, id).await?;
