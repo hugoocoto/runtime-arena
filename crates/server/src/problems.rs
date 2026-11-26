@@ -211,7 +211,7 @@ pub async fn upload(
     if q.rejudge {
         let requeued = sqlx::query!(
             "UPDATE submissions SET status = 'queued', verdict = NULL, time_us = NULL,
-                memory_kib = NULL, report = NULL, error = NULL, judged_at = NULL,
+                memory_kib = NULL, report = NULL, error = NULL, judged_at = NULL, judging_started_at = NULL,
                 problem_version = ?, problem_dir = ?
              WHERE problem_id = (SELECT id FROM problems WHERE slug = ?)",
             version,

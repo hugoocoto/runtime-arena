@@ -80,6 +80,7 @@ async fn info(state: &AppState, round: RoundRow, show_problems: bool) -> ApiResu
         ends_at: round.ends_at,
         problems,
         server_time: now(),
+        queue: None,
     })
 }
 
@@ -107,7 +108,13 @@ pub async fn current(State(state): State<AppState>) -> ApiResult<Json<RoundInfo>
     let round = latest(&state)
         .await?
         .ok_or_else(|| ApiError::not_found("no round has started yet"))?;
-    Ok(Json(info(&state, round, false).await?))
+    let mut round = info(&state, round, false).await?;
+    if round.state == RoundState::Running {
+        let mut tx = state.db.begin().await?;
+        round.queue = Some(crate::queue::status(&state, &mut tx, round.id, 0).await?);
+        tx.commit().await?;
+    }
+    Ok(Json(round))
 }
 
 pub(crate) async fn current_info(state: &AppState) -> ApiResult<Option<RoundInfo>> {

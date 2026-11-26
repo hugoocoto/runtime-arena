@@ -533,6 +533,15 @@ pub fn print_round(round: &RoundInfo) {
         );
     }
     println!("  {} s between submissions", round.cooldown_seconds);
+    if let Some(queue) = &round.queue {
+        println!(
+            "  Judge queue: {} queued, {} judging, {} workers{}",
+            queue.queued,
+            queue.judging,
+            queue.workers,
+            wait_estimate(queue.estimated_wait_seconds)
+        );
+    }
     for p in &round.problems {
         println!(
             "  {:<20} {}  [{} ms, {} MiB]",
@@ -777,7 +786,16 @@ pub async fn submit(
             reqwest::multipart::Part::bytes(src).file_name("source.tar.gz"),
         );
     let sub = client.submit(form).await?;
-    println!("Submission {} queued for {problem}.", sub.id);
+    if let Some(position) = &sub.queue_position {
+        println!(
+            "Submission {} queued for {problem} ({} ahead in queue{}).",
+            sub.id,
+            position.ahead,
+            wait_estimate(position.estimated_wait_seconds)
+        );
+    } else {
+        println!("Submission {} queued for {problem}.", sub.id);
+    }
     if !wait {
         return Ok(true);
     }
@@ -794,6 +812,33 @@ pub async fn submit(
     };
     print_result(&done);
     Ok(done.verdict == Some(Verdict::Accepted))
+}
+
+fn wait_estimate(seconds: Option<u64>) -> String {
+    seconds.map_or_else(String::new, |secs| {
+        format!(
+            ", estimated wait {}",
+            format::duration(secs.min(i64::MAX as u64) as i64)
+        )
+    })
+}
+
+fn submission_timing(s: &SubmissionInfo) -> String {
+    let submitted_at = format::timestamp(s.submitted_at);
+    let mut text = format!("submitted {submitted_at}");
+    if let Some(started) = s.judging_started_at {
+        text.push_str(&format!(
+            ", judging started after {}",
+            format::duration(started.saturating_sub(s.submitted_at))
+        ));
+    }
+    if let Some(judged) = s.judged_at {
+        text.push_str(&format!(
+            ", verdict after {}",
+            format::duration(judged.saturating_sub(s.submitted_at))
+        ));
+    }
+    text
 }
 
 /// Prints live progress until the result arrives. Checks over HTTP when the
@@ -892,6 +937,7 @@ pub async fn submissions(config: &Config, id: Option<i64>, json: bool) -> Result
             return format::print_json(&s);
         }
         print_result(&s);
+        println!("  {}", submission_timing(&s));
         return Ok(());
     }
     let list: Vec<SubmissionInfo> = client.get("/api/me/submissions").await?;
@@ -913,7 +959,13 @@ pub async fn submissions(config: &Config, id: Option<i64>, json: bool) -> Result
             }
             _ => String::new(),
         };
-        println!("{:>5}  {:<16} {:<22} {numbers}", s.id, s.problem, verdict);
+        println!(
+            "{:>5}  {:<16} {:<22} {numbers}  {}",
+            s.id,
+            s.problem,
+            verdict,
+            submission_timing(&s)
+        );
     }
     Ok(())
 }

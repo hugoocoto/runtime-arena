@@ -320,6 +320,10 @@ Output is compared token by token unless you set a `checker`. It runs as
 - Each accepted test runs 3 times and the best run counts. CPU time includes all
   threads and child processes.
 - Boards freeze for the last `--freeze` minutes and reveal everything at the end.
+- `arena round --json` includes the active round’s aggregate judge queue.
+  `arena submit --no-wait` reports how many queued jobs were ahead at intake.
+  The wait estimate uses recent judging times and worker count. It estimates
+  the time until judging starts.
 - Participants wait 30 seconds between submissions by default (`--cooldown`).
 - Executables can be up to 64 MiB and source up to 16 MiB.
 - Sandboxes have no network, so multi-node MPI doesn't work. OpenMP, threads and

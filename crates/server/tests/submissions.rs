@@ -88,6 +88,8 @@ async fn accepted_submission_reaches_both_boards() {
     let sub = submit(&s, &alice, "time=30 memory=900").await;
     let done = wait_judged(&s, &alice, sub.id).await;
     assert_eq!(done.verdict, Some(Verdict::Accepted));
+    let started = done.judging_started_at.unwrap();
+    assert!(done.submitted_at <= started && started <= done.judged_at.unwrap());
     assert_eq!((done.time_us, done.memory_kib), (Some(30), Some(900)));
     assert_eq!(done.report.unwrap().tests.len(), 2);
 
@@ -100,6 +102,59 @@ async fn accepted_submission_reaches_both_boards() {
         ("alice", 1)
     );
     assert_eq!(b.by_memory[0].memory_kib, 900);
+}
+
+#[tokio::test]
+async fn queue_status_is_aggregate_and_submit_reports_jobs_ahead() {
+    let s = TestServer::new().await;
+    let (status, body) = s
+        .upload_problem("sum", common::problem_archive("sum"))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (alice, bob) = (user(&s, "alice").await, user(&s, "bob").await);
+    let round = start_round(&s, json!({"freeze_minutes": 59})).await;
+    let completed = submit(&s, &alice, "").await;
+    sqlx::query("UPDATE submissions SET status = 'done', judging_started_at = submitted_at, judged_at = submitted_at + 12 WHERE id = ?")
+        .bind(completed.id)
+        .execute(&s.state.db)
+        .await
+        .unwrap();
+    let active = submit(&s, &alice, "").await;
+    sqlx::query(
+        "UPDATE submissions SET status = 'judging', judging_started_at = submitted_at WHERE id = ?",
+    )
+    .bind(active.id)
+    .execute(&s.state.db)
+    .await
+    .unwrap();
+    let first = submit(&s, &alice, "").await.queue_position.unwrap();
+    assert_eq!(first.ahead, 0);
+    assert_eq!(first.estimated_wait_seconds, Some(12));
+
+    let (_, current) = s.get("/api/rounds/current", None).await;
+    assert_eq!(
+        current["queue"],
+        json!({
+            "queued": 1, "judging": 1, "workers": 1, "estimated_wait_seconds": 24
+        })
+    );
+    sqlx::query("UPDATE rounds SET freeze_at = ? WHERE id = ?")
+        .bind(arena_server::now() - 1)
+        .bind(round)
+        .execute(&s.state.db)
+        .await
+        .unwrap();
+    assert!(boards(&s, round, None).await[0].frozen);
+    let bob_submission = submit(&s, &bob, "").await;
+    let position = bob_submission.queue_position.unwrap();
+    assert_eq!(position.ahead, 1);
+    assert_eq!(position.estimated_wait_seconds, Some(24));
+    assert_eq!(
+        s.get(&format!("/api/submissions/{}", active.id), Some(&bob))
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
 }
 
 #[tokio::test]

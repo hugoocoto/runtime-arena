@@ -240,6 +240,25 @@ pub struct RoundInfo {
     /// The server's clock (Unix seconds) when this was sent, so clients can show
     /// the time left correctly even if their own clock is off.
     pub server_time: i64,
+    /// Aggregate judge load for the active round, when requested via the status API.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue: Option<QueueStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QueueStatus {
+    pub queued: u64,
+    pub judging: u64,
+    pub workers: u64,
+    /// Rough wait until judging starts for a new submission.
+    pub estimated_wait_seconds: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QueuePosition {
+    /// Queued submissions ahead of this one at intake, excluding active jobs.
+    pub ahead: u64,
+    pub estimated_wait_seconds: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -266,7 +285,13 @@ pub struct SubmissionInfo {
     pub memory_kib: Option<u64>,
     /// Unix time in seconds.
     pub submitted_at: i64,
+    /// Unix time in seconds when the judge claimed the current run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub judging_started_at: Option<i64>,
     pub judged_at: Option<i64>,
+    /// Queue snapshot returned when a submission is created.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue_position: Option<QueuePosition>,
     /// Per-test results once judged.
     pub report: Option<JudgeReport>,
 }

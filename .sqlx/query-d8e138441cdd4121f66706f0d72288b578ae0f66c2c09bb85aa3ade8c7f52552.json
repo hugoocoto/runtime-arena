@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT s.id, s.user_id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version,\n                s.status, s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at\n         FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id\n         WHERE s.id = ?",
+  "query": "SELECT s.id, s.user_id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version,\n                s.status, s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at, s.judging_started_at\n         FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id\n         WHERE s.id = ?",
   "describe": {
     "columns": [
       {
@@ -145,6 +145,17 @@
             "name": "judged_at"
           }
         }
+      },
+      {
+        "name": "judging_started_at",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submissions",
+            "name": "judging_started_at"
+          }
+        }
       }
     ],
     "parameters": {
@@ -163,8 +174,9 @@
       true,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "b455825eaa7bae6cbc733374aab20e375d185e819b2df18d4b1a79984a4a0b1e"
+  "hash": "d8e138441cdd4121f66706f0d72288b578ae0f66c2c09bb85aa3ade8c7f52552"
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE submissions SET status = 'queued', judging_started_at = NULL WHERE status = 'judging'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "104d802fb163ad1601c06f4ebc17dce7bc43c9bc5f35433493b8e614c895f00f"
+}

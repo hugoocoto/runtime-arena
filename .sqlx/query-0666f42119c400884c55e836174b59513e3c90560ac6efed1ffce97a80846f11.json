@@ -1,0 +1,28 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) FILTER (WHERE status = 'queued') AS \"queued!\",\n                  COUNT(*) FILTER (WHERE status = 'judging') AS \"judging!\"\n           FROM submissions WHERE status IN ('queued', 'judging')",
+  "describe": {
+    "columns": [
+      {
+        "name": "queued!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "judging!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0666f42119c400884c55e836174b59513e3c90560ac6efed1ffce97a80846f11"
+}
