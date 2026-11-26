@@ -136,6 +136,14 @@ fn rank(
         .collect()
 }
 
+async fn boards_for_round(state: &AppState, round: &RoundRow, live: bool) -> ApiResult<Vec<Board>> {
+    let mut boards = Vec::new();
+    for problem in crate::rounds::problems(state, round.id).await? {
+        boards.push(board(state, round, &problem, live).await?);
+    }
+    Ok(boards)
+}
+
 /// `GET /api/rounds/{id}/boards`: public (frozen near the end); live for the admin.
 pub async fn round_boards(
     State(state): State<AppState>,
@@ -147,11 +155,19 @@ pub async fn round_boards(
     if round.started_at.is_none() && !live {
         return Err(ApiError::not_found(format!("round {id} has not started")));
     }
-    let mut boards = Vec::new();
-    for problem in crate::rounds::problems(&state, id).await? {
-        boards.push(board(&state, &round, &problem, live).await?);
-    }
-    Ok(Json(boards))
+    Ok(Json(boards_for_round(&state, &round, live).await?))
+}
+
+/// `GET /api/rounds/current/boards`: public (frozen near the end); live for the admin.
+pub async fn current_boards(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> ApiResult<Json<Vec<Board>>> {
+    let live = crate::auth::is_admin(&headers, &state);
+    let round = crate::rounds::latest(&state)
+        .await?
+        .ok_or_else(|| ApiError::not_found("no round has started yet"))?;
+    Ok(Json(boards_for_round(&state, &round, live).await?))
 }
 
 /// `GET /api/rounds/{id}/problems/{slug}/accepted`: every accepted submission in
