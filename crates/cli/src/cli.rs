@@ -25,7 +25,13 @@ pub enum Command {
     Trust {
         /// e.g. https://192.168.1.42 (remembered afterwards)
         server: Option<String>,
-        /// Skip the interactive fingerprint confirmation.
+        /// SHA-256 fingerprint from the organiser, in hex with optional colons.
+        #[arg(long, conflicts_with = "yes")]
+        fingerprint: Option<String>,
+        /// Read a single PEM certificate from this file instead of downloading it.
+        #[arg(long)]
+        ca_file: Option<PathBuf>,
+        /// Trust the CA without checking its fingerprint.
         #[arg(short, long)]
         yes: bool,
     },

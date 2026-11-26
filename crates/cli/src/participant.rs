@@ -45,21 +45,48 @@ pub fn participant(config: &Config) -> Result<Client> {
 
 fn trust_server(server: &str) -> Result<String> {
     let server = server.trim().trim_end_matches('/');
-    if server.is_empty() {
-        bail!("no server address given");
-    }
     let server = if server.starts_with("https://") {
         server.to_owned()
-    } else if server.starts_with("http://") {
+    } else if server.is_empty() || server.contains("://") {
         bail!("LAN trust needs the final HTTPS address, for example https://192.168.1.42");
     } else {
         format!("https://{server}")
     };
-    Ok(crate::client::normalise_server(&server))
+    let url = reqwest::Url::parse(&server).context("invalid HTTPS server address")?;
+    if url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        bail!("give an HTTPS server address without credentials, a query, or a fragment");
+    }
+    Ok(server)
 }
 
-/// Downloads and saves the CA used by a LAN Caddy deployment.
-pub async fn trust(server: Option<&str>, yes: bool) -> Result<()> {
+fn parse_fingerprint(expected: &str) -> Result<String> {
+    let expected = expected.trim();
+    let hex = expected.replace(':', "");
+    if hex.len() != 64
+        || !hex.bytes().all(|b| b.is_ascii_hexdigit())
+        || (expected.contains(':') && expected.split(':').any(|pair| pair.len() != 2))
+    {
+        return Err(UsageError(
+            "--fingerprint must be a SHA-256 fingerprint (64 hex digits with optional colons)"
+                .into(),
+        )
+        .into());
+    }
+    Ok(hex.to_ascii_uppercase())
+}
+
+/// Saves the LAN CA after checking the given fingerprint or getting confirmation.
+pub async fn trust(
+    server: Option<&str>,
+    expected: Option<&str>,
+    ca_file: Option<&Path>,
+    yes: bool,
+) -> Result<()> {
     let server = match server {
         Some(server) => trust_server(server)?,
         None => {
@@ -67,18 +94,37 @@ pub async fn trust(server: Option<&str>, yes: bool) -> Result<()> {
             trust_server(&server)?
         }
     };
-    let certificate = Client::download_ca(&server).await?;
-    let fingerprint = Client::certificate_fingerprint(&certificate);
+    let expected = expected.map(parse_fingerprint).transpose()?;
+    if expected.is_none() && !yes && !ask::is_interactive() {
+        return Err(UsageError("missing --fingerprint in a non-interactive shell; use --yes only if you accept the CA without verification".into()).into());
+    }
+    let (certificate, fingerprint) = if let Some(path) = ca_file {
+        async {
+            let bytes = tokio::fs::read(path).await?;
+            Client::parse_ca(bytes)
+        }
+        .await
+        .with_context(|| format!("reading CA certificate from {}", path.display()))?
+    } else {
+        Client::download_ca(&server).await?
+    };
     println!("LAN CA SHA-256 fingerprint: {fingerprint}");
-    if !yes {
-        let answer: String = ask::required("Trust this certificate? Type yes", "--yes", None)?;
+    if let Some(expected) = expected {
+        if fingerprint.replace(':', "") != expected {
+            bail!(
+                "LAN CA fingerprint mismatch; check the server address and the fingerprint from the organiser"
+            );
+        }
+    } else if !yes {
+        let answer: String =
+            ask::required("Trust this certificate? Type yes", "--fingerprint", None)?;
         if answer != "yes" {
             bail!("certificate not trusted");
         }
     }
     let mut config = Config::load_file()?;
     config.set_server(&server);
-    config.ca_certificate = Some(String::from_utf8(certificate)?);
+    config.ca_certificate = Some(certificate);
     let path = config.save()?;
     println!(
         "Trusted LAN certificate for {server} in {}.",
