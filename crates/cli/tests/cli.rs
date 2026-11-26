@@ -158,6 +158,9 @@ async fn organiser_and_participant_flow() {
     assert_eq!(
         files.keys().map(String::as_str).collect::<Vec<_>>(),
         [
+            "another/samples/01.in",
+            "another/samples/01.out",
+            "another/statement.md",
             "manifest.json",
             "sum/samples/01.in",
             "sum/samples/01.out",
