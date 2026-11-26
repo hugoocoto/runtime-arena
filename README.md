@@ -259,7 +259,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena build -- <command>` | Build in the judge's environment (Docker) |
 | `arena submit <problem> <executable> --src <path>` | Submit and follow judging |
 | `arena submissions [id]` | List your submissions or show one |
-| `arena board` | Open the live leaderboards |
+| `arena board [--once\|--json]` | Open the live leaderboards, or print a snapshot |
 | `arena completions <shell>` | Print a shell completion script |
 
 ### Organisers
