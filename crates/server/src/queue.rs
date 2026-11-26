@@ -5,6 +5,7 @@ use std::time::Duration;
 use arena_judge::Problem;
 use arena_protocol::{JudgeReport, ServerEvent, Verdict};
 
+use crate::problems::resolve_dir;
 use crate::submissions::{executable_path, verdict_str};
 use crate::{AppState, Event, now};
 
@@ -66,7 +67,8 @@ pub(crate) async fn worker(state: AppState, box_id: u32) {
 
 async fn run(state: &AppState, box_id: u32, job: &Job) -> Result<(), sqlx::Error> {
     tracing::info!(submission = job.id, box_id, "judging");
-    let outcome = match Problem::load(&job.problem_dir) {
+    let dir = resolve_dir(&state.config.data_dir, &job.problem_dir);
+    let outcome = match Problem::load(dir) {
         Ok(problem) => {
             let exe = executable_path(state, job.id);
             let total = problem.tests.len() as u32;

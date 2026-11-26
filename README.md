@@ -247,6 +247,10 @@ samples = ["01"]       # tests shown to participants
 # checker = "check.sh" # optional
 ```
 
+Include a readable UTF-8 statement and both input and output files for every
+declared sample. The server checks these files on upload and before starting a
+round.
+
 Output is compared token by token unless you set a `checker`. It runs as
 `checker input output answer`, and exit code 0 accepts. See
 [`problems/sum`](problems/sum) for an example.

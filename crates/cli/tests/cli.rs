@@ -140,6 +140,19 @@ async fn organiser_and_participant_flow() {
         ca_certificate: None,
     };
     let work = tempfile::tempdir().unwrap();
+    let samples = work.path().join("samples");
+    participant::problem(&config, "sum", Some(&samples), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(samples.join("01.out")).unwrap(),
+        "7\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(samples.join("01.in")).unwrap(),
+        "3 4\n"
+    );
+
     let src = work.path().join("sol.c");
     std::fs::write(&src, "int main() {}").unwrap();
     let good = work.path().join("good");
