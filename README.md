@@ -68,6 +68,11 @@ arena build -- env ZIG_GLOBAL_CACHE_DIR=.zig-cache zig build-exe solution.zig -O
 arena submit sum sol --src solution.c
 ```
 
+When `--src` points to a directory, the CLI skips the submitted executable and
+recognizable ELF, Mach-O, and PE binaries. It prints the file count, archive size,
+and largest included files on stderr before uploading. To submit a script that is
+also your entire source, point `--src` directly at the script.
+
 The build image is large, so download it with `arena pull` before the contest
 starts. You don't need an account or any code for this.
 
