@@ -165,6 +165,11 @@ async fn run(cli: Cli) -> Result<bool> {
                 AdminCommand::Round(RoundCommand::List { json }) => {
                     admin::round_list(&c, json).await?
                 }
+                AdminCommand::Round(RoundCommand::Export { id, output }) => {
+                    let out =
+                        output.unwrap_or_else(|| format!("round-{id}-materials.tar.gz").into());
+                    admin::round_export(&c, id, &out).await?;
+                }
                 AdminCommand::Round(RoundCommand::Start { id }) => {
                     let id = round_id(&c, id).await?;
                     admin::round_action(&c, id, "start", None).await?

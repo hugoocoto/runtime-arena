@@ -157,6 +157,21 @@ arena admin round start 1
 Open `https://<domain>/` on the projector. Announce `https://<domain>/join` and
 the event code.
 
+### Keep private problem packages on the judge side
+
+- Keep problem packages, test generators, checkers, and expected outputs on the
+  organizer or judge machine. Give each contestant a clean working directory
+  outside the organizer’s checkout. On shared hardware, use separate accounts
+  or isolated environments with no access to the private workspace or server
+  data volume.
+- Before the round, run `arena admin round export 1` as the organizer. The
+  archive contains `manifest.json` with limits, `<slug>/statement.md`, and
+  `<slug>/samples/<name>.in` and `.out` for the declared public samples.
+  Keep the archive private until the scheduled reveal, then distribute it
+  from a location accessible to contestants.
+- If `arena problem <slug>` fails during a round, contestants should report
+  the slug and error to the organizer and use the public bundle if available.
+
 ### Before the event
 
 ```sh
