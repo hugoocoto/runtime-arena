@@ -11,7 +11,8 @@ use arena_cli::config::Config;
 use arena_cli::errors::EXIT_USAGE;
 use arena_cli::{admin, participant};
 use arena_protocol::{
-    CreateRound, JudgeReport, LoginRequest, SignupRequest, TestResult, UserInfo, UserToken, Verdict,
+    Board, CreateRound, JudgeReport, LoginRequest, RoundInfo, RoundState, SignupRequest,
+    TestResult, UserInfo, UserToken, Verdict,
 };
 use arena_server::backend::{JudgeFuture, ProgressFn};
 use arena_server::{AppState, JudgeBackend};
@@ -97,6 +98,9 @@ async fn organiser_and_participant_flow() {
     admin::problem_add(&admin_client, &fixture(), Some("sum"), false)
         .await
         .unwrap();
+    admin::problem_add(&admin_client, &fixture(), Some("another"), false)
+        .await
+        .unwrap();
     let anonymous_client = Client::new(&server, None).unwrap();
     let _: UserInfo = anonymous_client
         .post(
@@ -125,9 +129,9 @@ async fn organiser_and_participant_flow() {
         CreateRound {
             name: "CLI".into(),
             duration_minutes: 30,
-            freeze_minutes: 0,
+            freeze_minutes: 5,
             cooldown_seconds: 0,
-            problems: vec!["sum".into()],
+            problems: vec!["sum".into(), "another".into()],
         },
     )
     .await
@@ -154,6 +158,9 @@ async fn organiser_and_participant_flow() {
     assert_eq!(
         files.keys().map(String::as_str).collect::<Vec<_>>(),
         [
+            "another/samples/01.in",
+            "another/samples/01.out",
+            "another/statement.md",
             "manifest.json",
             "sum/samples/01.in",
             "sum/samples/01.out",
@@ -234,6 +241,55 @@ async fn organiser_and_participant_flow() {
         .map(|e| e.unwrap().path().unwrap().display().to_string())
         .collect();
     assert_eq!(names, ["sol.c"]);
+
+    let output = tokio::task::spawn_blocking(move || {
+        std::process::Command::new(env!("CARGO_BIN_EXE_arena"))
+            .env("ARENA_CONFIG", work.path().join("config.toml"))
+            .env("ARENA_SERVER", server)
+            .env("ARENA_ADMIN_TOKEN", ADMIN)
+            .args(["admin", "round", "clone", "1"])
+            .output()
+            .unwrap()
+    })
+    .await
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Round 2: CLI (not started)"));
+    let rounds: Vec<RoundInfo> = admin_client.get("/api/admin/rounds").await.unwrap();
+    let [source, copy] = rounds.as_slice() else {
+        panic!("expected the source round and its copy");
+    };
+    assert_eq!(source.state, RoundState::Running);
+    assert_ne!(source.id, copy.id);
+    assert_eq!(copy.state, RoundState::Draft);
+    assert_eq!(copy.started_at, None);
+    assert_eq!(copy.ends_at, None);
+    assert_eq!(copy.name, source.name);
+    assert_eq!(copy.duration_minutes, source.duration_minutes);
+    assert_eq!(copy.freeze_minutes, source.freeze_minutes);
+    assert_eq!(copy.cooldown_seconds, source.cooldown_seconds);
+    assert_eq!(copy.problems, source.problems);
+
+    admin::round_action(&admin_client, source.id, "stop", None)
+        .await
+        .unwrap();
+    admin::round_action(&admin_client, copy.id, "start", None)
+        .await
+        .unwrap();
+    let boards: Vec<Board> = anonymous_client
+        .get(&format!("/api/rounds/{}/boards", copy.id))
+        .await
+        .unwrap();
+    assert_eq!(boards.len(), 2);
+    assert!(
+        boards
+            .iter()
+            .all(|board| board.by_time.is_empty() && board.by_memory.is_empty())
+    );
 }
 
 #[tokio::test]

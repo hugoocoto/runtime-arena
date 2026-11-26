@@ -273,6 +273,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena admin problem list` | List problems |
 | `arena admin round create [--name] [--minutes] [--freeze] [--cooldown] <problems...>` | Create a round |
 | `arena admin round list` | List rounds |
+| `arena admin round clone <id>` | Copy a round’s settings and problem order to a new draft. Start it with `arena admin round start <new-id>` |
 | `arena admin round start\|stop <id>` | Start or end a round |
 | `arena admin round extend <id> <minutes>` | Add time to a running round |
 | `arena admin round delete <id>` | Delete a draft or finished round and its submissions |

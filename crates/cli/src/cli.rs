@@ -247,6 +247,11 @@ pub enum RoundCommand {
         #[arg(short, long, value_hint = clap::ValueHint::FilePath)]
         output: Option<PathBuf>,
     },
+    /// Copy a round's settings and problems to a new draft.
+    Clone {
+        #[arg(value_parser = positive_id)]
+        id: Option<i64>,
+    },
     /// Start a round.
     Start {
         #[arg(value_parser = positive_id)]

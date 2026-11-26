@@ -150,6 +150,7 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/rounds", get(rounds::list).post(rounds::create))
         .route("/rounds/{id}", delete(rounds::remove))
+        .route("/rounds/{id}/clone", post(rounds::clone_round))
         .route("/rounds/{id}/start", post(rounds::start))
         .route("/rounds/{id}/stop", post(rounds::stop))
         .route("/rounds/{id}/extend", post(rounds::extend))
