@@ -244,7 +244,7 @@ arena submissions 42</pre>
       <h2><b>6</b>Watch the board</h2>
       <p>Open live boards and charts in your terminal, or use the <a href="/">web leaderboard</a>.</p>
       <pre class="c">arena board</pre>
-      <p class="note">In the terminal board, <span class="key">1</span> to <span class="key">5</span> or <span class="key">Tab</span> switch between time, memory, time against memory, rank over time and your submissions. <span class="key">Left</span> and <span class="key">Right</span> change the problem. <span class="key">Q</span> quits.</p>
+      <p class="note">In the terminal board, <span class="key">1</span> to <span class="key">5</span> or <span class="key">Tab</span> switch between time, memory, time against memory, rank over time and your submissions. <span class="key">Left</span> and <span class="key">Right</span> change the problem. <span class="key">Q</span> quits. In scripts or without a terminal, pass <code>--once</code> for text or <code>--json</code> for JSON.</p>
     </section>
 
     <section class="plate" id="verdicts">
@@ -293,7 +293,7 @@ arena submissions 42</pre>
           <tr><td><code>arena build -- CMD</code></td><td>Compile in the judge's environment. Needs Docker.</td></tr>
           <tr><td><code>arena submit [problem] [file] --src PATH</code></td><td>Submit and follow the judging. Add <code>--no-wait</code> to return after the upload.</td></tr>
           <tr><td><code>arena submissions [id]</code></td><td>List your submissions in this round, or show one.</td></tr>
-          <tr><td><code>arena board</code></td><td>Open live leaderboards and charts.</td></tr>
+          <tr><td><code>arena board [--once|--json]</code></td><td>Open live leaderboards and charts, or print a one-shot snapshot.</td></tr>
           <tr><td><code>arena completions SHELL</code></td><td>Print a shell completion script.</td></tr>
         </tbody>
       </table></div>

@@ -96,8 +96,7 @@ pub(crate) async fn latest(state: &AppState) -> ApiResult<Option<RoundRow>> {
 }
 
 /// The round accepting submissions right now, if any.
-pub(crate) async fn running(state: &AppState) -> ApiResult<Option<RoundRow>> {
-    let t = now();
+pub(crate) async fn running(state: &AppState, t: i64) -> ApiResult<Option<RoundRow>> {
     Ok(latest(state)
         .await?
         .filter(|r| r.state(t) == RoundState::Running))
@@ -339,6 +338,25 @@ pub async fn start(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> ApiResult<Json<RoundInfo>> {
+    // Keep the checked version stable until the round is marked as started.
+    let uploads = state.upload_lock.lock().await;
+    let round = find_row(&state, id).await?;
+    if round.started_at.is_some() {
+        return Err(ApiError::conflict(format!(
+            "round {id} has already started"
+        )));
+    }
+    let entries = problems(&state, id).await?;
+    let preflight_state = state.clone();
+    tokio::task::spawn_blocking(move || -> ApiResult<()> {
+        for problem in entries {
+            problem.validate_public_material(&preflight_state)?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(ApiError::internal)??;
+
     let t = now();
     let mut tx = state.db.begin().await?;
     let running = sqlx::query_scalar!(
@@ -365,6 +383,7 @@ pub async fn start(
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
+    drop(uploads);
     if updated.rows_affected() == 0 {
         let round = find_row(&state, id).await?;
         return Err(ApiError::conflict(format!(

@@ -26,7 +26,10 @@ contestants’ files and settings alone.
 Read the active round and its problem statements. Develop and test your own
 solutions, submit them through the participant interface, and use judge feedback
 to guide your work. Leave the judge, hidden tests, and other contestants’ work
-alone.
+alone. Use samples from `arena problem --samples <dir> <slug>` or the public
+bundle supplied by the organizer. If the statement command fails, tell the
+organizer which slug failed and what error you saw. Use only the organizer’s
+public materials and tests you create yourself.
 
 **Keep iterating until the contest ends**, even if every solution has passed or
 you lead both leaderboards. Treat each accepted solution as a baseline. Look for

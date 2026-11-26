@@ -1,11 +1,12 @@
 //! `arena admin ...`: participants, problems, rounds and submission review.
 
-use std::path::Path;
+use std::io::Write;
+use std::path::{Component, Path};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use arena_protocol::{
-    CreateRound, ExtendRound, PasswordReset, ProblemSummary, RoundInfo, SubmissionInfo, UpdateInfo,
-    UserInfo,
+    CreateRound, ExtendRound, PasswordReset, ProblemStatement, ProblemSummary, RoundInfo,
+    SubmissionInfo, UpdateInfo, UserInfo,
 };
 use serde_json::json;
 
@@ -161,6 +162,89 @@ pub async fn round_list(c: &Client, json: bool) -> Result<()> {
         print_round(&r);
     }
     Ok(())
+}
+
+pub async fn round_export(c: &Client, id: i64, out: &Path) -> Result<()> {
+    let rounds: Vec<RoundInfo> = c.get("/api/admin/rounds").await?;
+    let round = rounds
+        .into_iter()
+        .find(|round| round.id == id)
+        .with_context(|| format!("round {id} does not exist"))?;
+    let gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut tar = tar::Builder::new(gzip);
+    let mut problems = Vec::new();
+    for summary in round.problems {
+        let slug = archive_name(&summary.slug)?;
+        let problem: ProblemStatement = c.get(&format!("/api/problems/{slug}")).await?;
+        archive_file(
+            &mut tar,
+            &format!("{slug}/statement.md"),
+            problem.statement.as_bytes(),
+        )?;
+        let mut samples = Vec::new();
+        for sample in &problem.samples {
+            let name = archive_name(&sample.name)?;
+            archive_file(
+                &mut tar,
+                &format!("{slug}/samples/{name}.in"),
+                sample.input.as_bytes(),
+            )?;
+            archive_file(
+                &mut tar,
+                &format!("{slug}/samples/{name}.out"),
+                sample.output.as_bytes(),
+            )?;
+            samples.push(name);
+        }
+        problems.push(json!({
+            "slug": slug,
+            "title": problem.title,
+            "time_limit_ms": problem.time_limit_ms,
+            "memory_limit_mb": problem.memory_limit_mb,
+            "samples": samples,
+        }));
+    }
+    let manifest = json!({"round_id": id, "round_name": round.name, "problems": problems});
+    archive_file(
+        &mut tar,
+        "manifest.json",
+        &serde_json::to_vec_pretty(&manifest)?,
+    )?;
+    let bytes = tar.into_inner()?.finish()?;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(out)
+        .with_context(|| format!("creating {}", out.display()))?;
+    file.write_all(&bytes)
+        .with_context(|| format!("writing {}", out.display()))?;
+    println!(
+        "Public materials for round {id} written to {}.",
+        out.display()
+    );
+    Ok(())
+}
+
+fn archive_name(name: &str) -> Result<&str> {
+    let mut components = Path::new(name).components();
+    if name.contains(['/', '\\', ':'])
+        || !matches!(components.next(), Some(Component::Normal(_)))
+        || components.next().is_some()
+    {
+        bail!("invalid bundle file name {name:?}");
+    }
+    Ok(name)
+}
+
+fn archive_file(
+    tar: &mut tar::Builder<impl Write>,
+    path: &str,
+    bytes: &[u8],
+) -> std::io::Result<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_size(bytes.len() as u64);
+    header.set_mode(0o644);
+    tar.append_data(&mut header, path, bytes)
 }
 
 pub async fn round_action(c: &Client, id: i64, action: &str, minutes: Option<u32>) -> Result<()> {

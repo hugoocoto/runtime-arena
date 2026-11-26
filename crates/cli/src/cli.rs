@@ -25,7 +25,13 @@ pub enum Command {
     Trust {
         /// e.g. https://192.168.1.42 (remembered afterwards)
         server: Option<String>,
-        /// Skip the interactive fingerprint confirmation.
+        /// SHA-256 fingerprint from the organiser, in hex with optional colons.
+        #[arg(long, conflicts_with = "yes")]
+        fingerprint: Option<String>,
+        /// Read a single PEM certificate from this file instead of downloading it.
+        #[arg(long)]
+        ca_file: Option<PathBuf>,
+        /// Trust the CA without checking its fingerprint.
         #[arg(short, long)]
         yes: bool,
     },
@@ -122,9 +128,19 @@ pub enum Command {
         id: Option<i64>,
         #[arg(long)]
         json: bool,
+        /// Show your refused submissions across rounds.
+        #[arg(long, requires = "json", conflicts_with = "id")]
+        refused: bool,
     },
-    /// Live leaderboards and charts.
-    Board,
+    /// Live leaderboards and charts (or a snapshot with --once / --json).
+    Board {
+        /// Print the current boards once as text instead of opening the live view.
+        #[arg(long)]
+        once: bool,
+        /// Print the current boards as JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Organiser commands (need the admin token).
     Admin {
         #[command(subcommand)]
@@ -224,6 +240,13 @@ pub enum RoundCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Export the statements, limits, and public samples of a round.
+    Export {
+        #[arg(value_parser = positive_id)]
+        id: i64,
+        #[arg(short, long, value_hint = clap::ValueHint::FilePath)]
+        output: Option<PathBuf>,
+    },
     /// Start a round.
     Start {
         #[arg(value_parser = positive_id)]
@@ -294,5 +317,30 @@ mod tests {
     #[test]
     fn login_no_longer_takes_a_token() {
         assert!(Cli::try_parse_from(["arena", "login", "host:8080", "arena_abc"]).is_err());
+    }
+
+    #[test]
+    fn board_accepts_once_and_json() {
+        assert!(matches!(
+            Cli::parse_from(["arena", "board"]).command,
+            Command::Board {
+                once: false,
+                json: false
+            }
+        ));
+        assert!(matches!(
+            Cli::parse_from(["arena", "board", "--once"]).command,
+            Command::Board {
+                once: true,
+                json: false
+            }
+        ));
+        assert!(matches!(
+            Cli::parse_from(["arena", "board", "--json"]).command,
+            Command::Board {
+                once: false,
+                json: true
+            }
+        ));
     }
 }

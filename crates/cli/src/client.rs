@@ -1,7 +1,11 @@
 //! HTTP and WebSocket access to an arena server.
 
+use std::time::Duration;
+
 use anyhow::{Context, Result, bail};
-use arena_protocol::{ApiError, ServerEvent, ServerInfo};
+use arena_protocol::{
+    ApiError, SUBMISSION_CLIENT_TIME_HEADER, ServerEvent, ServerInfo, SubmissionInfo,
+};
 use futures_util::StreamExt;
 use reqwest::{Method, RequestBuilder, Response, StatusCode};
 use rustls::RootCertStore;
@@ -143,43 +147,66 @@ impl Client {
         })
     }
 
-    /// Downloads the LAN CA over the unauthenticated HTTP bootstrap endpoint.
-    /// The caller must show and, unless explicitly overridden, confirm the
-    /// fingerprint before saving it.
-    pub async fn download_ca(server: &str) -> Result<Vec<u8>> {
+    /// Downloads and parses the CA from the HTTP bootstrap endpoint. The caller
+    /// still needs to confirm its identity before saving it.
+    pub async fn download_ca(server: &str) -> Result<(String, String)> {
+        const MAX_CA_BYTES: usize = 64 * 1024;
         init_tls();
-        let base = normalise_server(server);
-        let bootstrap = base
-            .strip_prefix("https://")
-            .map_or_else(|| base.clone(), |rest| format!("http://{rest}"));
-        let response = reqwest::Client::new()
-            .get(format!("{bootstrap}/arena-ca.crt"))
+        let url = format!("{}/arena-ca.crt", server.replacen("https://", "http://", 1));
+        let mut response = reqwest::Client::new()
+            .get(&url)
+            .timeout(Duration::from_secs(10))
             .send()
             .await
-            .with_context(|| format!("could not download the LAN certificate from {bootstrap}"))?;
-        if !response.status().is_success() {
-            bail!(
-                "the server did not offer a LAN certificate at {bootstrap}/arena-ca.crt (HTTP {})",
-                response.status()
-            );
+            .with_context(|| format!("could not fetch the LAN CA from {url}; use --ca-file with a certificate from the organiser"))?;
+        let status = response.status();
+        let source = format!("{} returned HTTP {status}", response.url());
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await.with_context(|| {
+            format!("{source}; could not read the CA response after {} bytes; use --ca-file with a certificate from the organiser", bytes.len())
+        })? {
+            if chunk.len() > MAX_CA_BYTES - bytes.len() {
+                bail!("{source} with more than {MAX_CA_BYTES} bytes; use --ca-file with a certificate from the organiser");
+            }
+            bytes.extend_from_slice(&chunk);
         }
-        let bytes = response.bytes().await?.to_vec();
-        if !bytes
-            .windows(b"-----BEGIN CERTIFICATE-----".len())
-            .any(|window| window == b"-----BEGIN CERTIFICATE-----")
-        {
-            bail!("the server returned an invalid CA certificate");
+        let source = format!("{source} ({} bytes)", bytes.len());
+        if !status.is_success() {
+            bail!("{source}; use --ca-file with a certificate from the organiser");
         }
-        Ok(bytes)
+        Self::parse_ca(bytes).with_context(|| {
+            format!("{source}; expected a PEM certificate. Use --ca-file with a certificate from the organiser")
+        })
     }
 
-    pub fn certificate_fingerprint(certificate: &[u8]) -> String {
-        let digest = Sha256::digest(certificate);
-        digest
+    /// Requires a single X.509 certificate and hashes its DER bytes. The same
+    /// certificate is saved as PEM for both HTTPS and WebSocket connections.
+    pub fn parse_ca(bytes: Vec<u8>) -> Result<(String, String)> {
+        let pem = String::from_utf8(bytes).context("certificate is not UTF-8 PEM")?;
+        let pem = pem.trim();
+        if !pem.starts_with("-----BEGIN CERTIFICATE-----")
+            || !matches!(pem.split_once("-----END CERTIFICATE-----"), Some((_, "")))
+        {
+            bail!("expected a single PEM certificate");
+        }
+        let mut certificates = CertificateDer::pem_slice_iter(pem.as_bytes());
+        let certificate = certificates
+            .next()
+            .transpose()?
+            .context("no PEM certificate found")?;
+        if certificates.next().is_some() {
+            bail!("expected a single PEM certificate");
+        }
+        let digest = Sha256::digest(certificate.as_ref());
+        RootCertStore::empty()
+            .add(certificate)
+            .context("invalid X.509 certificate")?;
+        let fingerprint = digest
             .iter()
             .map(|byte| format!("{byte:02X}"))
             .collect::<Vec<_>>()
-            .join(":")
+            .join(":");
+        Ok((pem.to_owned(), fingerprint))
     }
 
     pub fn base(&self) -> &str {
@@ -267,14 +294,15 @@ impl Client {
         self.parse(resp).await
     }
 
-    pub async fn post_multipart<T: DeserializeOwned>(
-        &self,
-        path: &str,
-        form: reqwest::multipart::Form,
-    ) -> Result<T> {
-        let resp = self
-            .send(self.request(Method::POST, path).multipart(form))
-            .await?;
+    pub async fn submit(&self, form: reqwest::multipart::Form) -> Result<SubmissionInfo> {
+        let request = self
+            .request(Method::POST, "/api/submissions")
+            .header(
+                SUBMISSION_CLIENT_TIME_HEADER,
+                crate::format::now().to_string(),
+            )
+            .multipart(form);
+        let resp = self.send(request).await?;
         self.parse(resp).await
     }
 
