@@ -46,6 +46,14 @@ impl ProblemRow {
     fn load(&self, state: &AppState) -> Result<Problem, arena_judge::Error> {
         Problem::load(resolve_dir(&state.config.data_dir, &self.dir))
     }
+
+    pub(crate) fn validate_public_material(&self, state: &AppState) -> ApiResult<()> {
+        let bad =
+            |error| ApiError::conflict(format!("problem {} is not ready: {error}", self.slug));
+        let problem = self.load(state).map_err(|error| bad(error.to_string()))?;
+        read_public_material(&problem).map_err(bad)?;
+        Ok(())
+    }
 }
 
 pub(crate) async fn find(state: &AppState, slug: &str) -> ApiResult<ProblemRow> {
@@ -153,7 +161,8 @@ pub async fn upload(
 
     let problem = {
         let dir = dir.clone();
-        tokio::task::spawn_blocking(move || unpack_problem(&body, &dir))
+        let slug = slug.clone();
+        tokio::task::spawn_blocking(move || unpack_problem(&body, &dir, &slug))
             .await
             .map_err(ApiError::internal)?
     };
@@ -239,9 +248,10 @@ pub async fn upload(
 /// Only regular files and directories are accepted (no links), and tar refuses
 /// paths that leave `dir`. `problem.toml` may sit at the top or inside a single
 /// top-level directory.
-fn unpack_problem(archive: &[u8], dir: &FsPath) -> Result<Problem, ApiError> {
+fn unpack_problem(archive: &[u8], dir: &FsPath, slug: &str) -> Result<Problem, ApiError> {
     std::fs::create_dir_all(dir).map_err(ApiError::internal)?;
-    let bad = |msg: String| ApiError::bad_request(format!("invalid problem archive: {msg}"));
+    let bad =
+        |msg: String| ApiError::bad_request(format!("invalid archive for problem {slug}: {msg}"));
 
     let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(archive));
     let entries = tar.entries().map_err(|e| bad(e.to_string()))?;
@@ -269,7 +279,9 @@ fn unpack_problem(archive: &[u8], dir: &FsPath) -> Result<Problem, ApiError> {
     }
 
     let root = find_root(dir).ok_or_else(|| bad("no problem.toml found".into()))?;
-    Problem::load(&root).map_err(|e| ApiError::bad_request(e.to_string()))
+    let problem = Problem::load(&root).map_err(|error| bad(error.to_string()))?;
+    read_public_material(&problem).map_err(bad)?;
+    Ok(problem)
 }
 
 fn find_root(dir: &FsPath) -> Option<PathBuf> {
@@ -309,13 +321,19 @@ pub async fn statement(
         }
     }
 
-    read_statement(
-        &row,
-        &row.load(&state)
-            .map_err(|error| unavailable(&slug, error))?,
-    )
-    .map(Json)
-    .map_err(|error| unavailable(&slug, error))
+    let problem = row
+        .load(&state)
+        .map_err(|error| unavailable(&slug, error))?;
+    let (statement, samples) =
+        read_public_material(&problem).map_err(|error| unavailable(&slug, error))?;
+    Ok(Json(ProblemStatement {
+        slug: row.slug,
+        title: row.title,
+        time_limit_ms: row.time_limit_ms as u64,
+        memory_limit_mb: row.memory_limit_kib as u64 / 1024,
+        statement,
+        samples,
+    }))
 }
 
 fn unavailable(slug: &str, error: impl std::fmt::Display) -> ApiError {
@@ -326,36 +344,24 @@ fn unavailable(slug: &str, error: impl std::fmt::Display) -> ApiError {
     )
 }
 
-fn read_statement(row: &ProblemRow, problem: &Problem) -> Result<ProblemStatement, String> {
+fn read_public_material(problem: &Problem) -> Result<(String, Vec<Sample>), String> {
     let statement_path = problem.dir.join("statement.md");
-    let statement = match std::fs::read_to_string(&statement_path) {
-        Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(error) => {
-            return Err(format!("reading {}: {error}", statement_path.display()));
-        }
-    };
+    let statement = std::fs::read_to_string(&statement_path)
+        .map_err(|error| format!("reading {}: {error}", statement_path.display()))?;
     let mut samples = Vec::new();
     for name in &problem.samples {
         let test = problem
             .tests
             .iter()
             .find(|t| &t.name == name)
-            .ok_or_else(|| format!("sample {name} missing in {}", row.slug))?;
+            .ok_or_else(|| format!("missing sample {name}"))?;
         samples.push(Sample {
             name: name.clone(),
             input: read_capped(&test.input)?,
             output: read_capped(&test.answer)?,
         });
     }
-    Ok(ProblemStatement {
-        slug: row.slug.clone(),
-        title: row.title.clone(),
-        time_limit_ms: row.time_limit_ms as u64,
-        memory_limit_mb: row.memory_limit_kib as u64 / 1024,
-        statement,
-        samples,
-    })
+    Ok((statement, samples))
 }
 
 fn read_capped(path: &FsPath) -> Result<String, String> {

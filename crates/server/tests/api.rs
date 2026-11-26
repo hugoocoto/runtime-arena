@@ -608,6 +608,71 @@ async fn participant_guide_is_public() {
 }
 
 #[tokio::test]
+async fn invalid_public_material_blocks_round_start() {
+    let s = TestServer::new().await;
+    let (status, body) = s
+        .upload_problem("sum", common::problem_archive("sum"))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let participant = s.participant("alice").await;
+    let (status, body) = s
+        .post(
+            "/api/admin/rounds",
+            Some(ADMIN),
+            json!({"name": "Preflight", "duration_minutes": 60, "problems": ["sum"]}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let round: RoundInfo = serde_json::from_value(body).unwrap();
+    let start_url = format!("/api/admin/rounds/{}/start", round.id);
+
+    let answer_path = s.state.config.data_dir.join("problems/sum/v1/tests/01.out");
+    let answer = std::fs::read(&answer_path).unwrap();
+    std::fs::remove_file(&answer_path).unwrap();
+    let (status, body) = s.post(&start_url, Some(ADMIN), json!({})).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    let error = body["error"].as_str().unwrap();
+    assert!(error.contains("problem sum is not ready"), "{error}");
+    assert!(error.contains("01.out"), "{error}");
+    assert_eq!(
+        s.get("/api/rounds/current", None).await.0,
+        StatusCode::NOT_FOUND
+    );
+
+    std::fs::write(&answer_path, answer).unwrap();
+    let (status, body) = s.post(&start_url, Some(ADMIN), json!({})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let round: RoundInfo = serde_json::from_value(body).unwrap();
+    assert_eq!(round.state, RoundState::Running);
+
+    std::fs::remove_file(&answer_path).unwrap();
+    let (status, body) = s.get("/api/problems/sum", Some(&participant)).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        body,
+        json!({"error": "statement or samples for problem sum are unavailable"})
+    );
+}
+
+#[tokio::test]
+async fn problem_upload_requires_a_readable_statement() {
+    let s = TestServer::new().await;
+    let gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    let mut tar = tar::Builder::new(gz);
+    let fixture =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../judge/tests/fixtures/sum");
+    tar.append_path_with_name(fixture.join("problem.toml"), "problem.toml")
+        .unwrap();
+    tar.append_dir_all("tests", fixture.join("tests")).unwrap();
+    let archive = tar.into_inner().unwrap().finish().unwrap();
+    let (status, body) = s.upload_problem("sum", archive).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    let error = body["error"].as_str().unwrap();
+    assert!(error.contains("problem sum"), "{error}");
+    assert!(error.contains("statement.md"), "{error}");
+}
+
+#[tokio::test]
 async fn problem_statements_survive_data_directory_relocation() {
     let parent = tempfile::tempdir().unwrap();
     let original = parent.path().join("original");
