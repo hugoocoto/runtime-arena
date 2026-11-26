@@ -176,13 +176,16 @@ jobs:
         run: '"target/$TARGET/release/arena" generate extras'
 
   release-image:
-    name: release image ${{ matrix.target }}
+    name: release image ${{ matrix.target }} (${{ matrix.platform }})
     if: startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
-        target: [server, build-env]
-    runs-on: ubuntu-24.04
+        include:
+          - { target: server, platform: linux/amd64, os: ubuntu-24.04 }
+          - { target: build-env, platform: linux/amd64, os: ubuntu-24.04 }
+          - { target: build-env, platform: linux/arm64, os: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -191,8 +194,19 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: ${{ matrix.target }}
-          platforms: linux/amd64
+          platforms: ${{ matrix.platform }}
           cache-from: type=gha,scope=${{ matrix.target }}
+          load: ${{ matrix.target == 'build-env' }}
+          tags: runtime-arena-build-env:release-check
+      - name: Check ARM64 build tools
+        if: matrix.platform == 'linux/arm64'
+        run: |
+          docker run --rm --platform linux/arm64 runtime-arena-build-env:release-check bash -e -c '
+            printf "int main(void) { return 0; }\n" | gcc -x c -o /tmp/arena-check -
+            readelf -h /tmp/arena-check | grep -E "Machine: +AArch64"
+            /tmp/arena-check
+            zig version
+          '
 
   # The required check. It passes only if every job above passed or was skipped
   # on purpose, so new jobs are enforced without changing branch protection.

@@ -23,12 +23,16 @@ RUN apt-get update \
 FROM base AS build-env
 RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc g++ libc6-dev make git cargo rustc curl xz-utils \
- && curl -fsSL -o /tmp/zig.tar.xz \
-      https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz \
- && echo '24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c  /tmp/zig.tar.xz' \
-      | sha256sum -c - \
+ && case "$(dpkg --print-architecture)" in \
+      amd64) zig_arch=x86_64; zig_sha=24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c ;; \
+      arm64) zig_arch=aarch64; zig_sha=f7a654acc967864f7a050ddacfaa778c7504a0eca8d2b678839c21eea47c992b ;; \
+      *) echo 'Unsupported build environment architecture' >&2; exit 1 ;; \
+    esac \
+ && zig_dir="zig-${zig_arch}-linux-0.14.1" \
+ && curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/0.14.1/${zig_dir}.tar.xz" \
+ && echo "${zig_sha}  /tmp/zig.tar.xz" | sha256sum -c - \
  && tar -xJf /tmp/zig.tar.xz -C /opt \
- && ln -s /opt/zig-x86_64-linux-0.14.1/zig /usr/local/bin/zig \
+ && ln -s "/opt/${zig_dir}/zig" /usr/local/bin/zig \
  && rm -f /tmp/zig.tar.xz \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /work

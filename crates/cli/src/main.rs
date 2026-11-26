@@ -68,7 +68,12 @@ async fn run(cli: Cli) -> Result<bool> {
             participant::logout(admin).await?;
             return Ok(true);
         }
-        Command::Pull { image } => return participant::pull(&image),
+        Command::Build {
+            image,
+            platform,
+            command,
+        } => return participant::build(&image, platform, &command).await,
+        Command::Pull { image, platform } => return participant::pull(&image, platform).await,
         Command::Completions { shell } => {
             generate::completions(shell, &mut std::io::stdout());
             return Ok(true);
@@ -85,6 +90,7 @@ async fn run(cli: Cli) -> Result<bool> {
         | Command::Trust { .. }
         | Command::Login { .. }
         | Command::Logout { .. }
+        | Command::Build { .. }
         | Command::Pull { .. }
         | Command::Completions { .. }
         | Command::Generate { .. } => unreachable!("handled above"),
@@ -99,7 +105,6 @@ async fn run(cli: Cli) -> Result<bool> {
             let slug: String = ask::required("Problem", "<SLUG>", slug)?;
             participant::problem(&config, &slug, samples.as_deref(), json).await?
         }
-        Command::Build { image, command } => return participant::build(&image, &command),
         Command::Submit {
             problem,
             executable,
