@@ -352,3 +352,53 @@ async fn deleting_a_round_keeps_the_files_of_submissions_that_reuse_its_ids() {
         Some(Verdict::Accepted)
     );
 }
+
+#[tokio::test]
+async fn submission_refusals_record_reasons_and_stay_private() {
+    use arena_protocol::{SUBMISSION_CLIENT_TIME_HEADER, SubmissionRefusal};
+    use axum::body::Body;
+    use axum::http::{Request, header};
+
+    let s = server().await;
+    let alice = user(&s, "alice").await;
+    let bob = user(&s, "bob").await;
+    let before = arena_server::now();
+    assert_eq!(
+        s.submit(&alice, "sum", fake_solution("verdict=accepted"))
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        s.submit(&alice, "sum", b"invalid".to_vec()).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    let request = Request::post("/api/submissions")
+        .header(header::AUTHORIZATION, format!("Bearer {alice}"))
+        .header(SUBMISSION_CLIENT_TIME_HEADER, "12345")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(s.request(request).await.0, StatusCode::BAD_REQUEST);
+
+    let path = "/api/me/submission-refusals";
+    let (status, body) = s.get(path, Some(&alice)).await;
+    assert_eq!(status, StatusCode::OK);
+    let attempts: Vec<SubmissionRefusal> = serde_json::from_value(body).unwrap();
+    let reasons: Vec<_> = attempts
+        .iter()
+        .map(|attempt| attempt.reason.as_str())
+        .collect();
+    assert_eq!(
+        reasons,
+        ["round_not_running", "bad_binary", "invalid_multipart"]
+    );
+    assert_eq!(attempts[0].problem.as_deref(), Some("sum"));
+    assert_eq!(attempts[0].client_at, None);
+    assert_eq!(attempts[2].client_at, Some(12345));
+    for attempt in attempts {
+        assert!(attempt.received_at >= before);
+        assert!(attempt.refused_at >= attempt.received_at);
+    }
+    assert_eq!(s.get(path, Some(&bob)).await, (StatusCode::OK, json!([])));
+    assert_eq!(s.get(path, None).await.0, StatusCode::UNAUTHORIZED);
+}

@@ -626,7 +626,7 @@ pub async fn submit(
             "source",
             reqwest::multipart::Part::bytes(src).file_name("source.tar.gz"),
         );
-    let sub: SubmissionInfo = client.post_multipart("/api/submissions", form).await?;
+    let sub = client.submit(form).await?;
     println!("Submission {} queued for {problem}.", sub.id);
     if !wait {
         return Ok(true);
@@ -725,6 +725,13 @@ pub fn print_result(s: &SubmissionInfo) {
             println!("  test {}: {} {msg}", t.name, format::verdict(t.verdict));
         }
     }
+}
+
+pub async fn submission_refusals(config: &Config) -> Result<()> {
+    let client = participant(config)?;
+    let attempts: Vec<arena_protocol::SubmissionRefusal> =
+        client.get("/api/me/submission-refusals").await?;
+    format::print_json(&attempts)
 }
 
 pub async fn submissions(config: &Config, id: Option<i64>, json: bool) -> Result<()> {

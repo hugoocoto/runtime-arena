@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT problem, reason, client_at, received_at, refused_at\n         FROM submission_refusals WHERE user_id = ? ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "name": "problem",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "submission_refusals",
+            "name": "problem"
+          }
+        }
+      },
+      {
+        "name": "reason",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "submission_refusals",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "name": "client_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submission_refusals",
+            "name": "client_at"
+          }
+        }
+      },
+      {
+        "name": "received_at",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submission_refusals",
+            "name": "received_at"
+          }
+        }
+      },
+      {
+        "name": "refused_at",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "submission_refusals",
+            "name": "refused_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "4c3bc8c405fe966585e7d6dd8c3d622e98f22ab67df89946329e08ac5b96cb8e"
+}

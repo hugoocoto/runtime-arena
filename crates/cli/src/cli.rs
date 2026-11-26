@@ -122,6 +122,9 @@ pub enum Command {
         id: Option<i64>,
         #[arg(long)]
         json: bool,
+        /// Show your refused submissions across rounds.
+        #[arg(long, requires = "json", conflicts_with = "id")]
+        refused: bool,
     },
     /// Live leaderboards and charts.
     Board,

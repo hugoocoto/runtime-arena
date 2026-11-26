@@ -95,8 +95,7 @@ pub(crate) async fn latest(state: &AppState) -> ApiResult<Option<RoundRow>> {
 }
 
 /// The round accepting submissions right now, if any.
-pub(crate) async fn running(state: &AppState) -> ApiResult<Option<RoundRow>> {
-    let t = now();
+pub(crate) async fn running(state: &AppState, t: i64) -> ApiResult<Option<RoundRow>> {
     Ok(latest(state)
         .await?
         .filter(|r| r.state(t) == RoundState::Running))

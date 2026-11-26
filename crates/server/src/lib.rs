@@ -169,6 +169,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/login", post(accounts::login))
         .route("/api/logout", post(accounts::logout))
         .route("/api/me/submissions", get(submissions::mine))
+        .route(
+            "/api/me/submission-refusals",
+            get(submissions::mine_refusals),
+        )
         .route("/api/rounds/current", get(rounds::current))
         .route("/api/rounds/{id}/boards", get(boards::round_boards))
         .route(

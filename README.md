@@ -203,6 +203,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena build -- <command>` | Build in the judge's environment (Docker) |
 | `arena submit <problem> <executable> --src <path>` | Submit and follow judging |
 | `arena submissions [id]` | List your submissions or show one |
+| `arena submissions --json --refused` | Show your server-refused submission attempts, with reason codes and Unix timestamps |
 | `arena board` | Open the live leaderboards |
 | `arena completions <shell>` | Print a shell completion script |
 
