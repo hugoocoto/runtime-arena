@@ -2,10 +2,13 @@
 #![cfg(target_os = "linux")]
 
 use std::path::Path;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 
+use arena_cli::board::{self, BoardSnapshot};
 use arena_cli::client::Client;
 use arena_cli::config::Config;
+use arena_cli::errors::EXIT_USAGE;
 use arena_cli::{admin, participant};
 use arena_protocol::{
     CreateRound, JudgeReport, LoginRequest, SignupRequest, TestResult, UserInfo, UserToken, Verdict,
@@ -179,4 +182,163 @@ async fn organiser_and_participant_flow() {
         .map(|e| e.unwrap().path().unwrap().display().to_string())
         .collect();
     assert_eq!(names, ["sol.c"]);
+}
+
+#[tokio::test]
+async fn board_snapshot_and_non_tty_behavior() {
+    let data = tempfile::tempdir().unwrap();
+    let server = start_server(data.path()).await;
+    let admin_client = Client::new(&server, Some(ADMIN.into())).unwrap();
+
+    admin::problem_add(&admin_client, &fixture(), Some("sum"), false)
+        .await
+        .unwrap();
+    let anonymous_client = Client::new(&server, None).unwrap();
+    let _: UserInfo = anonymous_client
+        .post(
+            "/api/signup",
+            &SignupRequest {
+                name: "alice".into(),
+                display_name: Some("Alice".into()),
+                password: "secret1".into(),
+                join_code: JOIN_CODE.into(),
+            },
+        )
+        .await
+        .unwrap();
+    let alice: UserToken = anonymous_client
+        .post(
+            "/api/login",
+            &LoginRequest {
+                name: "alice".into(),
+                password: "secret1".into(),
+            },
+        )
+        .await
+        .unwrap();
+    admin::round_create(
+        &admin_client,
+        CreateRound {
+            name: "Snapshot".into(),
+            duration_minutes: 30,
+            freeze_minutes: 0,
+            cooldown_seconds: 0,
+            problems: vec!["sum".into()],
+        },
+    )
+    .await
+    .unwrap();
+    admin::round_action(&admin_client, 1, "start", None)
+        .await
+        .unwrap();
+
+    let config = Config {
+        server: Some(server.clone()),
+        token: Some(alice.token.clone()),
+        admin_token: None,
+        ca_certificate: None,
+    };
+    let work = tempfile::tempdir().unwrap();
+    let src = work.path().join("sol.c");
+    std::fs::write(&src, "int main() {}").unwrap();
+    let good = work.path().join("good");
+    std::fs::write(&good, "#!/bin/sh\necho 7\n").unwrap();
+    assert!(
+        participant::submit(&config, "sum", &good, &src, true)
+            .await
+            .unwrap()
+    );
+
+    let snap = board::fetch_snapshot(&anonymous_client).await.unwrap();
+    assert_eq!(snap.round.name, "Snapshot");
+    assert_eq!(snap.boards.len(), 1);
+    assert_eq!(snap.boards[0].problem, "sum");
+    assert_eq!(snap.boards[0].by_time[0].user, "alice");
+    assert_eq!(snap.boards[0].by_time[0].time_us, 7);
+    assert_eq!(snap.boards[0].by_time[0].memory_kib, 2048);
+
+    // Run the compiled CLI binary with non-TTY stdin/stdout against this server.
+    let bin = env!("CARGO_BIN_EXE_arena");
+    let cfg_path = work.path().join("config.toml");
+    std::fs::write(&cfg_path, "").unwrap();
+
+    let plain = tokio::task::spawn_blocking({
+        let server = server.clone();
+        let cfg_path = cfg_path.clone();
+        move || {
+            Command::new(bin)
+                .arg("board")
+                .env("ARENA_CONFIG", &cfg_path)
+                .env("ARENA_SERVER", &server)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap()
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(plain.status.code(), Some(i32::from(EXIT_USAGE)));
+    let stderr = String::from_utf8_lossy(&plain.stderr);
+    assert!(
+        stderr.contains("--once") && stderr.contains("--json"),
+        "expected actionable non-TTY error, got: {stderr}"
+    );
+
+    let json_out = tokio::task::spawn_blocking({
+        let server = server.clone();
+        let cfg_path = cfg_path.clone();
+        move || {
+            Command::new(bin)
+                .args(["board", "--json"])
+                .env("ARENA_CONFIG", &cfg_path)
+                .env("ARENA_SERVER", &server)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap()
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        json_out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&json_out.stderr)
+    );
+    let parsed: BoardSnapshot = serde_json::from_slice(&json_out.stdout).unwrap();
+    assert_eq!(parsed.round.name, "Snapshot");
+    assert_eq!(parsed.boards[0].by_time[0].submission_id, 1);
+
+    let once_out = tokio::task::spawn_blocking({
+        let server = server.clone();
+        let cfg_path = cfg_path.clone();
+        let token = alice.token.clone();
+        move || {
+            Command::new(bin)
+                .args(["board", "--once"])
+                .env("ARENA_CONFIG", &cfg_path)
+                .env("ARENA_SERVER", &server)
+                .env("ARENA_TOKEN", &token)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap()
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        once_out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&once_out.stderr)
+    );
+    let text = String::from_utf8_lossy(&once_out.stdout);
+    assert!(text.contains("Round 1: Snapshot"), "{text}");
+    assert!(text.contains("Fastest"), "{text}");
+    assert!(text.contains("Leanest"), "{text}");
+    assert!(text.contains("Alice (alice) *"), "{text}");
 }

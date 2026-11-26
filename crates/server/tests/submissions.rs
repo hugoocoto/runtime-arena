@@ -352,3 +352,20 @@ async fn deleting_a_round_keeps_the_files_of_submissions_that_reuse_its_ids() {
         Some(Verdict::Accepted)
     );
 }
+
+#[tokio::test]
+async fn current_boards_matches_the_latest_started_round() {
+    let s = server().await;
+    let (status, _) = s.get("/api/rounds/current/boards", None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let alice = user(&s, "alice").await;
+    let round = start_round(&s, json!({})).await;
+    let sub = submit(&s, &alice, "time=15 memory=600").await;
+    wait_judged(&s, &alice, sub.id).await;
+
+    let (status, body) = s.get("/api/rounds/current/boards", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let current: Vec<Board> = serde_json::from_value(body).unwrap();
+    assert_eq!(current, boards(&s, round, None).await);
+}
