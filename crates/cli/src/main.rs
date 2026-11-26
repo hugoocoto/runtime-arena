@@ -19,8 +19,19 @@ async fn main() -> ExitCode {
 async fn run(cli: Cli) -> Result<bool> {
     // These work without a saved configuration.
     let command = match cli.command {
-        Command::Trust { server, yes } => {
-            participant::trust(server.as_deref(), yes).await?;
+        Command::Trust {
+            server,
+            fingerprint,
+            ca_file,
+            yes,
+        } => {
+            participant::trust(
+                server.as_deref(),
+                fingerprint.as_deref(),
+                ca_file.as_deref(),
+                yes,
+            )
+            .await?;
             return Ok(true);
         }
         Command::Signup {

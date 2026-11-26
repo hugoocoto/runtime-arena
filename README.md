@@ -143,6 +143,42 @@ and import it into that machine's trusted root certificates:
 docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt arena-local-ca.crt
 ```
 
+For `arena trust`, give participants the SHA-256 fingerprint through a trusted
+channel. Use the hex value printed after `Fingerprint=`. The fingerprint hashes
+the certificate’s DER encoding, so it matches OpenSSL and browser tools.
+
+```sh
+openssl x509 -in arena-local-ca.crt -noout -fingerprint -sha256
+arena trust https://<server> --fingerprint "$FINGERPRINT"
+```
+
+By default, the CLI fetches `/arena-ca.crt` over HTTP on the same host and
+explicit port as the HTTPS address. If the address has no port, it uses port 80
+for the download. If that route is unavailable, give the participants the
+exported PEM certificate through a trusted channel and use it directly. This
+works with HTTPS on any port and with an existing reverse proxy.
+
+```sh
+arena trust https://<server> --ca-file arena-local-ca.crt --fingerprint "$FINGERPRINT"
+```
+
+To serve the CA from an existing Caddy instance, add a handler to the applicable
+HTTP site block. Keep only the exported public certificate in the directory
+served by this handler.
+
+```caddyfile
+http://arena.local {
+    handle /arena-ca.crt {
+        root * /srv/arena-ca
+        rewrite * /arena-local-ca.crt
+        file_server
+    }
+    handle {
+        redir https://arena.local{uri} permanent
+    }
+}
+```
+
 ### 2. Run a round
 
 Run these from the repository directory on the host:
@@ -191,7 +227,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 
 | Command | Purpose |
 |---|---|
-| `arena trust <server>` | Trust a LAN server's certificate |
+| `arena trust <server> [--fingerprint <sha256>] [--ca-file <pem>]` | Trust a LAN server’s CA |
 | `arena signup [server]` | Create an account and log in |
 | `arena login [server]` | Log in on this device |
 | `arena logout` | Log out of this device |
