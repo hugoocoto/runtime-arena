@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.12.0](https://github.com/hugoocoto/runtime-arena/compare/v0.11.1...v0.12.0) (2026-11-26)
+
+
+### Features
+
+* **admin:** clone rounds into new drafts ([#71](https://github.com/hugoocoto/runtime-arena/issues/71)) ([6afe029](https://github.com/hugoocoto/runtime-arena/commit/6afe029a1f1d5a40bb5d7863d8977117cc2c28cf)), closes [#64](https://github.com/hugoocoto/runtime-arena/issues/64)
+* **cli:** add --once and --json snapshots to arena board ([#66](https://github.com/hugoocoto/runtime-arena/issues/66)) ([5cc1eff](https://github.com/hugoocoto/runtime-arena/commit/5cc1effbf21da8371a9cbbbc4e1ea6bdd9164a68)), closes [#39](https://github.com/hugoocoto/runtime-arena/issues/39) [#40](https://github.com/hugoocoto/runtime-arena/issues/40) [#48](https://github.com/hugoocoto/runtime-arena/issues/48) [#56](https://github.com/hugoocoto/runtime-arena/issues/56)
+* **cli:** export public round materials for contestants ([#70](https://github.com/hugoocoto/runtime-arena/issues/70)) ([72d4196](https://github.com/hugoocoto/runtime-arena/commit/72d41966db1ba0219e8e2aeebeed4109984b9d32)), closes [#46](https://github.com/hugoocoto/runtime-arena/issues/46) [#52](https://github.com/hugoocoto/runtime-arena/issues/52) [#59](https://github.com/hugoocoto/runtime-arena/issues/59)
+* **judge:** show queue load and submission timing ([#75](https://github.com/hugoocoto/runtime-arena/issues/75)) ([368be4b](https://github.com/hugoocoto/runtime-arena/commit/368be4baea5b04439aa95717d9a772a405bd82b7))
+* **server:** audit refused submissions ([#72](https://github.com/hugoocoto/runtime-arena/issues/72)) ([54732e5](https://github.com/hugoocoto/runtime-arena/commit/54732e5881c7194ce24edc723b874b6c77102619))
+
+
+### Bug Fixes
+
+* **cli:** skip compiled binaries when archiving submission sources ([#69](https://github.com/hugoocoto/runtime-arena/issues/69)) ([25a6980](https://github.com/hugoocoto/runtime-arena/commit/25a69800b4f2ae39e0a92a94c6968a54c9eec526)), closes [#57](https://github.com/hugoocoto/runtime-arena/issues/57)
+* **cli:** target the judge architecture for builds ([#73](https://github.com/hugoocoto/runtime-arena/issues/73)) ([a9ee808](https://github.com/hugoocoto/runtime-arena/commit/a9ee808fe7d5d1119cb9441be916f044eddccab5))
+* **cli:** verify LAN CA fingerprints and support offline trust ([#74](https://github.com/hugoocoto/runtime-arena/issues/74)) ([306a22c](https://github.com/hugoocoto/runtime-arena/commit/306a22c11f81fb6ab2d3d6ceb46cbf3632761a4a)), closes [#43](https://github.com/hugoocoto/runtime-arena/issues/43) [#54](https://github.com/hugoocoto/runtime-arena/issues/54) [#61](https://github.com/hugoocoto/runtime-arena/issues/61) [#62](https://github.com/hugoocoto/runtime-arena/issues/62)
+* **server:** keep problem materials available and preflight round starts ([#67](https://github.com/hugoocoto/runtime-arena/issues/67)) ([4601749](https://github.com/hugoocoto/runtime-arena/commit/4601749dd402d4c9874ac367f078206edbf7aa9f)), closes [#42](https://github.com/hugoocoto/runtime-arena/issues/42) [#45](https://github.com/hugoocoto/runtime-arena/issues/45) [#49](https://github.com/hugoocoto/runtime-arena/issues/49)
+* **web:** honor problem deep links on the scoreboard ([#68](https://github.com/hugoocoto/runtime-arena/issues/68)) ([ae09911](https://github.com/hugoocoto/runtime-arena/commit/ae099112abc52b87b76d6d2639bb8b8f8e3a17a5)), closes [#60](https://github.com/hugoocoto/runtime-arena/issues/60)
+
 ## [0.11.1](https://github.com/hugoocoto/runtime-arena/compare/v0.11.0...v0.11.1) (2026-11-24)
 
 
