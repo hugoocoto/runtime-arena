@@ -204,6 +204,7 @@ commands accept `--json`, and `man arena` lists exit codes.
 | `arena submit <problem> <executable> --src <path>` | Submit and follow judging |
 | `arena submissions [id]` | List your submissions or show one |
 | `arena board` | Open the live leaderboards |
+| `arena board --json` | Print the current round’s public standings as a JSON array, with Fastest and Leanest rankings and freeze status for each problem |
 | `arena completions <shell>` | Print a shell completion script |
 
 ### Organisers

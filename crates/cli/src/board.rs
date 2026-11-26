@@ -4,9 +4,10 @@
 //! (by CPU time) and, when logged in, your own submissions.
 
 use std::collections::{BTreeMap, HashMap};
+use std::io::IsTerminal;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use arena_protocol::{
     AcceptedSubmission, Board, BoardEntry, RoundInfo, RoundState, ServerEvent, SubmissionInfo,
     SubmissionStatus, Verdict,
@@ -21,6 +22,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Block, Cell, Chart, Dataset, GraphType, Paragraph, Row, Table, Tabs};
 
 use crate::client::Client;
+use crate::errors::UsageError;
 use crate::format;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,12 +130,27 @@ impl State {
     }
 }
 
+pub async fn print_snapshot(client: &Client) -> Result<()> {
+    let round: RoundInfo = client.get("/api/rounds/current").await?;
+    let boards: Vec<Board> = client
+        .get(&format!("/api/rounds/{}/boards", round.id))
+        .await?;
+    format::print_json(&boards)
+}
+
 pub async fn run(client: Client, logged_in: bool) -> Result<()> {
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        return Err(UsageError(
+            "arena board needs an interactive terminal. Use 'arena board --json' for a snapshot."
+                .into(),
+        )
+        .into());
+    }
     let mut state = State {
         status: format!("connecting to {}", client.base()),
         ..State::default()
     };
-    let mut terminal = ratatui::init();
+    let mut terminal = ratatui::try_init().context("failed to initialize terminal")?;
     let result = event_loop(&mut terminal, &client, logged_in, &mut state).await;
     ratatui::restore();
     result

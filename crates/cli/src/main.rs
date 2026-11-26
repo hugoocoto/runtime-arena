@@ -101,13 +101,15 @@ async fn run(cli: Cli) -> Result<bool> {
             return participant::submit(&config, &problem, &executable, &src, !no_wait).await;
         }
         Command::Submissions { id, json } => participant::submissions(&config, id, json).await?,
-        Command::Board => {
-            let client = Client::with_ca(
-                config.server()?,
-                config.token.clone(),
-                config.ca_certificate.as_deref(),
-            )?;
-            board::run(client, config.token.is_some()).await?
+        Command::Board { json } => {
+            let token = if json { None } else { config.token.clone() };
+            let client =
+                Client::with_ca(config.server()?, token, config.ca_certificate.as_deref())?;
+            if json {
+                board::print_snapshot(&client).await?;
+            } else {
+                board::run(client, config.token.is_some()).await?;
+            }
         }
         Command::Admin { command } => {
             let c = admin::admin(&config)?;

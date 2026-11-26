@@ -156,6 +156,41 @@ async fn organiser_and_participant_flow() {
         .unwrap();
     assert!(!accepted);
 
+    let output = tokio::task::spawn_blocking({
+        let server = server.clone();
+        let config_path = work.path().join("arena.toml");
+        move || {
+            let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_arena"));
+            command
+                .env("ARENA_CONFIG", config_path)
+                .env("ARENA_SERVER", server)
+                .env_remove("ARENA_TOKEN")
+                .arg("board");
+            let interactive = command.output().unwrap();
+            assert_eq!(interactive.status.code(), Some(2));
+            assert!(interactive.stdout.is_empty());
+            assert!(String::from_utf8_lossy(&interactive.stderr).contains("arena board --json"));
+            command.arg("--json").output().unwrap()
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let boards: Vec<arena_protocol::Board> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(boards.len(), 1);
+    let board = &boards[0];
+    assert_eq!(board.problem, "sum");
+    assert!(!board.frozen);
+    assert_eq!(board.by_time.len(), 1);
+    assert_eq!(board.by_time, board.by_memory);
+    assert_eq!(board.by_time[0].rank, 1);
+    assert_eq!(board.by_time[0].user, "alice");
+    assert_eq!(board.by_time[0].submission_id, 1);
+
     // Without a participant token there is nothing to submit with.
     let anonymous = Config {
         token: None,

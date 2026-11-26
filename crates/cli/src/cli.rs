@@ -124,7 +124,11 @@ pub enum Command {
         json: bool,
     },
     /// Live leaderboards and charts.
-    Board,
+    Board {
+        /// Print a one-shot JSON snapshot of the public standings.
+        #[arg(long)]
+        json: bool,
+    },
     /// Organiser commands (need the admin token).
     Admin {
         #[command(subcommand)]
