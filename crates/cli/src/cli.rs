@@ -12,6 +12,23 @@ const BUILD_IMAGE: &str = concat!(
 
 /// Runtime Arena: submit solutions and follow the contest from your terminal.
 /// In a terminal, arguments you leave out are asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum BuildPlatform {
+    #[value(name = "linux/amd64")]
+    Amd64,
+    #[value(name = "linux/arm64")]
+    Arm64,
+}
+
+impl BuildPlatform {
+    pub fn docker_platform(self) -> &'static str {
+        match self {
+            Self::Amd64 => "linux/amd64",
+            Self::Arm64 => "linux/arm64",
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "arena", version, about)]
 pub struct Cli {
@@ -94,6 +111,9 @@ pub enum Command {
         /// Build image to use.
         #[arg(long, default_value = BUILD_IMAGE)]
         image: String,
+        /// Override judge detection, for example when building offline.
+        #[arg(long)]
+        platform: Option<BuildPlatform>,
         #[arg(last = true)]
         command: Vec<String>,
     },
@@ -102,11 +122,14 @@ pub enum Command {
         /// Build image to download.
         #[arg(long, default_value = BUILD_IMAGE)]
         image: String,
+        /// Override judge detection, for example before signing in.
+        #[arg(long)]
+        platform: Option<BuildPlatform>,
     },
     /// Submit an executable and follow its judging.
     Submit {
         problem: Option<String>,
-        /// Linux x86-64 executable or #! script.
+        /// Linux executable matching the judge architecture (see arena specs), or a #! script.
         #[arg(value_hint = clap::ValueHint::FilePath)]
         executable: Option<PathBuf>,
         /// Your source code (file or directory); required, kept for review.
@@ -280,7 +303,7 @@ mod tests {
 
     #[test]
     fn pull_defaults_to_the_image_build_uses() {
-        let Command::Pull { image: pulled } = Cli::parse_from(["arena", "pull"]).command else {
+        let Command::Pull { image: pulled, .. } = Cli::parse_from(["arena", "pull"]).command else {
             panic!("expected pull");
         };
         let Command::Build { image: built, .. } =

@@ -239,20 +239,32 @@ async fn write_files(dir: &FsPath, executable: &[u8], source: &[u8]) -> std::io:
     tokio::fs::write(dir.join("source"), source).await
 }
 
-/// Accepts a Linux x86-64 ELF executable, or a `#!` script whose interpreter exists here
-/// (the judge runs in this same environment).
+/// Accepts an ELF executable for the judge architecture, or a `#!` script whose
+/// interpreter exists here (the judge runs in this same environment).
 fn check_executable(bytes: &[u8]) -> Result<(), String> {
-    const EM_X86_64: u16 = 62;
+    check_executable_for_arch(bytes, std::env::consts::ARCH)
+}
+
+fn check_executable_for_arch(bytes: &[u8], arch: &str) -> Result<(), String> {
     if bytes.starts_with(b"\x7fELF") {
         if bytes.len() < 20 {
             return Err("truncated ELF file".into());
         }
         let (class, endian) = (bytes[4], bytes[5]);
         let machine = u16::from_le_bytes([bytes[18], bytes[19]]);
-        if class != 2 || endian != 1 || machine != EM_X86_64 {
-            return Err(
-                "executable is not for Linux x86-64; build it in the build-env image".into(),
-            );
+        let (expected_machine, label) = match arch {
+            "x86_64" => (62, "x86-64"),
+            "aarch64" => (183, "ARM64"),
+            _ => {
+                return Err(format!(
+                    "ELF submissions are unsupported on the {arch} judge"
+                ));
+            }
+        };
+        if class != 2 || endian != 1 || machine != expected_machine {
+            return Err(format!(
+                "executable is not for Linux {label}; target the judge architecture (see arena specs)"
+            ));
         }
         return Ok(());
     }
@@ -279,7 +291,7 @@ fn check_executable(bytes: &[u8]) -> Result<(), String> {
         }
         return Ok(());
     }
-    Err("not a Linux x86-64 executable or a #! script".into())
+    Err("not a Linux ELF executable or a #! script".into())
 }
 
 /// `GET /api/submissions/{id}`: your own submission, or any for the admin.
@@ -393,10 +405,12 @@ mod tests {
     }
 
     #[test]
-    fn accepts_x86_64_elf_only() {
-        assert!(check_executable(&elf(2, 62)).is_ok());
-        assert!(check_executable(&elf(2, 183)).is_err(), "aarch64");
-        assert!(check_executable(&elf(1, 3)).is_err(), "32-bit x86");
+    fn matches_elf_to_judge_architecture() {
+        assert!(check_executable_for_arch(&elf(2, 62), "x86_64").is_ok());
+        assert!(check_executable_for_arch(&elf(2, 183), "aarch64").is_ok());
+        assert!(check_executable_for_arch(&elf(2, 183), "x86_64").is_err());
+        assert!(check_executable_for_arch(&elf(2, 62), "aarch64").is_err());
+        assert!(check_executable_for_arch(&elf(1, 3), "x86_64").is_err());
         assert!(check_executable(b"\x7fELF").is_err());
     }
 

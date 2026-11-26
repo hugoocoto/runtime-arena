@@ -180,3 +180,71 @@ async fn organiser_and_participant_flow() {
         .collect();
     assert_eq!(names, ["sol.c"]);
 }
+
+#[tokio::test]
+async fn build_and_pull_select_judge_platform_and_allow_offline_override() {
+    let data = tempfile::tempdir().unwrap();
+    let docker = data.path().join("docker");
+    std::fs::write(&docker, "#!/bin/sh\nprintf '%s\\n' \"$@\"\n").unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&docker, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let server = format!("http://{}", listener.local_addr().unwrap());
+    let app = axum::Router::new().route(
+        "/api/host",
+        axum::routing::get(|| async {
+            axum::Json(serde_json::json!({
+                "arch": "aarch64",
+                "cpu_flags": [],
+                "caches": [],
+                "judge": {
+                    "workers": 1,
+                    "runs_per_test": 1,
+                    "processes": 1,
+                    "max_failures": 1,
+                    "microsecond_timing": false,
+                },
+            }))
+        }),
+    );
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let config_path = data.path().join("config.toml");
+    let path = std::env::join_paths(
+        std::iter::once(data.path().to_path_buf())
+            .chain(std::env::split_paths(&std::env::var_os("PATH").unwrap())),
+    )
+    .unwrap();
+    let invoke = move |args: &[&str], server: &str| {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_arena"))
+            .args(args)
+            .env("PATH", &path)
+            .env("ARENA_CONFIG", &config_path)
+            .env("ARENA_SERVER", server)
+            .env("ARENA_TOKEN", "participant-token")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap()
+    };
+
+    tokio::task::spawn_blocking(move || {
+        let build = invoke(&["build", "--", "gcc", "main.c"], &server);
+        assert!(build.starts_with("run\n--rm\n--platform\nlinux/arm64\n"));
+        assert!(build.ends_with("gcc\nmain.c\n"));
+        let pull = invoke(&["pull"], &server);
+        assert!(pull.starts_with("pull\n--platform\nlinux/arm64\n"));
+
+        let offline = invoke(&["pull", "--platform", "linux/amd64"], "http://127.0.0.1:1");
+        assert!(offline.starts_with("pull\n--platform\nlinux/amd64\n"));
+        let unconfigured = invoke(&["build", "--", "gcc", "main.c"], "");
+        assert!(unconfigured.starts_with("run\n--rm\n--platform\nlinux/amd64\n"));
+    })
+    .await
+    .unwrap();
+}

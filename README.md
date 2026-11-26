@@ -11,8 +11,8 @@ Runtime Arena is a self-hosted judge for small programming contests. Instead of
 scoring who solves the most problems, it ranks correct solutions by how **fast**
 and how **lean** they run.
 
-Participants write code in any language and submit a Linux x86-64 executable or
-a `#!` script with the `arena` CLI. The server runs it in an
+Participants write code in any language and submit a Linux executable for the
+judge architecture or a `#!` script with the `arena` CLI. The server runs it in an
 [isolate](https://github.com/ioi/isolate) sandbox against hidden tests and
 updates live CPU time and memory leaderboards, in the terminal and on a
 projector page.
@@ -68,8 +68,16 @@ arena build -- env ZIG_GLOBAL_CACHE_DIR=.zig-cache zig build-exe solution.zig -O
 arena submit sum sol --src solution.c
 ```
 
-The build image is large, so download it with `arena pull` before the contest
-starts. You don't need an account or any code for this.
+After you sign in, `arena build` and `arena pull` use the architecture reported by
+`arena specs`. The build image is available for Linux AMD64 and ARM64. With no
+configured server the CLI defaults to AMD64. Use `--platform linux/amd64` or
+`--platform linux/arm64` to select a platform explicitly, including when pulling
+the image before signing in. Docker needs emulation when building for a different
+architecture from its host.
+
+If Docker cannot run the ARM64 image, build a static Linux ARM64 executable
+with `zig cc -target aarch64-linux-musl -static -O2 -o sol solution.c` or
+`zig c++ -target aarch64-linux-musl -static -O2 -o sol solution.cpp`.
 
 Every server hosts a full participant guide at `https://<domain>/help`.
 

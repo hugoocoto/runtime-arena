@@ -11,6 +11,7 @@ use arena_protocol::{
 };
 
 use crate::ask;
+use crate::cli::BuildPlatform;
 use crate::client::{Client, version_mismatch};
 use crate::config::Config;
 use crate::errors::{NotLoggedIn, UsageError, status_of};
@@ -384,12 +385,16 @@ pub async fn whoami(config: &Config, json: bool) -> Result<()> {
 
 pub async fn specs(config: &Config, json: bool) -> Result<()> {
     let client = participant(config)?;
-    let host: HostInfo = client.get("/api/host").await?;
+    let host = judge_specs(&client).await?;
     if json {
         return format::print_json(&host);
     }
     print!("{}", render_specs(&host, client.base()));
     Ok(())
+}
+
+async fn judge_specs(client: &Client) -> Result<HostInfo> {
+    client.get("/api/host").await
 }
 
 /// The `arena specs` text.
@@ -761,18 +766,46 @@ pub async fn submissions(config: &Config, id: Option<i64>, json: bool) -> Result
     Ok(())
 }
 
+async fn build_platform(override_platform: Option<BuildPlatform>) -> Result<BuildPlatform> {
+    if let Some(platform) = override_platform {
+        return Ok(platform);
+    }
+    let config = Config::load()?;
+    if config.server.is_none() {
+        return Ok(BuildPlatform::Amd64);
+    }
+    let platform_hint = "cannot detect the judge architecture; sign in to the judge or select \
+        --platform linux/amd64 or --platform linux/arm64";
+    let client = participant(&config).context(platform_hint)?;
+    let host = judge_specs(&client).await.context(platform_hint)?;
+    match host.arch.as_str() {
+        "x86_64" => Ok(BuildPlatform::Amd64),
+        "aarch64" => Ok(BuildPlatform::Arm64),
+        arch => Err(UsageError(format!(
+            "no standard build image for judge architecture {arch}; use a toolchain that targets \
+             that Linux architecture"
+        ))
+        .into()),
+    }
+}
+
 /// Runs a build command in the build image, which matches the judge's environment.
-pub fn build(image: &str, command: &[String]) -> Result<bool> {
+pub async fn build(
+    image: &str,
+    override_platform: Option<BuildPlatform>,
+    command: &[String],
+) -> Result<bool> {
     if command.is_empty() {
         return Err(UsageError(
             "give the build command after `--`, e.g. `arena build -- gcc -O2 -o sol sol.c`".into(),
         )
         .into());
     }
+    let platform = build_platform(override_platform).await?;
     let cwd = std::env::current_dir()?;
     let mut docker = std::process::Command::new("docker");
     docker
-        .args(["run", "--rm", "--platform", "linux/amd64"])
+        .args(["run", "--rm", "--platform", platform.docker_platform()])
         .arg("-v")
         .arg(format!("{}:/work", cwd.display()))
         .args(["-w", "/work"]);
@@ -789,17 +822,38 @@ pub fn build(image: &str, command: &[String]) -> Result<bool> {
         .args(command)
         .status()
         .context(DOCKER_UNAVAILABLE)?;
+    // Docker uses 125 when it could not launch the container.
+    if status.code() == Some(125) {
+        build_image_hint(image, platform);
+    }
     Ok(status.success())
 }
 
 /// Downloads the build image for the platform `build` runs it on.
-pub fn pull(image: &str) -> Result<bool> {
+pub async fn pull(image: &str, override_platform: Option<BuildPlatform>) -> Result<bool> {
+    let platform = build_platform(override_platform).await?;
     let status = std::process::Command::new("docker")
-        .args(["pull", "--platform", "linux/amd64"])
+        .args(["pull", "--platform", platform.docker_platform()])
         .arg(image)
         .status()
         .context(DOCKER_UNAVAILABLE)?;
+    if !status.success() {
+        build_image_hint(image, platform);
+    }
     Ok(status.success())
+}
+
+fn build_image_hint(image: &str, platform: BuildPlatform) {
+    eprintln!(
+        "Check that {image} supports {} and that Docker can run that platform.",
+        platform.docker_platform()
+    );
+    if platform == BuildPlatform::Arm64 {
+        eprintln!(
+            "For ARM64 C or C++ builds, you can also cross-compile with \
+             `zig cc -target aarch64-linux-musl -static` or `zig c++ -target aarch64-linux-musl -static`."
+        );
+    }
 }
 
 const DOCKER_UNAVAILABLE: &str = "cannot run Docker; is it installed and running? \

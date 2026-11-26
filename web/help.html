@@ -199,7 +199,7 @@ arena problem sum --samples samples</pre>
 
     <section class="plate" id="build">
       <h2><b>4</b>Write and build</h2>
-      <p>The judge runs a Linux x86-64 executable or a script that starts with <code>#!</code>. Pick your language.</p>
+      <p>The judge runs a Linux executable for its architecture (shown by <code>arena specs</code>) or a script that starts with <code>#!</code>. Pick your language.</p>
       <div class="tabs" role="group" aria-label="Language">
         <button data-group="lang" data-value="python" aria-pressed="true">Python</button>
         <button data-group="lang" data-value="c" aria-pressed="false">C</button>
@@ -220,7 +220,7 @@ print(sum(numbers))</pre>
       <div class="panel" data-for="lang" data-value="cpp" hidden><p>Needs Docker. This writes an executable called <code>sol</code>.</p><pre class="c">arena build -- g++ -O2 -std=c++20 -o sol solution.cpp</pre></div>
       <div class="panel" data-for="lang" data-value="rust" hidden><p>Needs Docker. The executable lands in <code>target/release/solution</code>.</p><pre class="c">arena build -- cargo build --release --bin solution</pre></div>
       <div class="panel" data-for="lang" data-value="zig" hidden><p>Needs Docker. This writes an executable called <code>sol</code>.</p><pre class="c">arena build -- zig build-exe solution.zig -O ReleaseFast -femit-bin=sol</pre></div>
-      <p class="note"><code>arena build</code> compiles inside the judge's environment, so your program links against the same libraries. On Apple Silicon it runs under emulation. The image is large, so run <code>arena pull</code> before the contest to download it.</p>
+      <p class="note"><code>arena build</code> and <code>arena pull</code> select the signed-in judge's Linux platform. Use <code>--platform linux/amd64</code> or <code>--platform linux/arm64</code> to choose explicitly, including before signing in. Docker needs emulation when the target differs from its host. If Docker cannot run ARM64, try <code>zig cc -target aarch64-linux-musl -static -O2 -o sol solution.c</code> or <code>zig c++ -target aarch64-linux-musl -static -O2 -o sol solution.cpp</code>.</p>
     </section>
 
     <section class="plate" id="submit">
@@ -307,7 +307,7 @@ arena submissions 42</pre>
         <div><dt><code>wait N s before submitting again</code></dt><dd>The wait between submissions is still running. Try again after N seconds.</dd></div>
         <div><dt><code>no round is running</code></dt><dd>Submissions open when the organiser starts the round and close when it ends.</dd></div>
         <div><dt><code>problem NAME is not in this round</code></dt><dd>Run <code>arena round</code> and copy the problem's short name.</dd></div>
-        <div><dt><code>executable is not for Linux x86-64</code></dt><dd>Build with <code>arena build -- ...</code>, or submit a <code>#!</code> script.</dd></div>
+        <div><dt><code>executable is not for Linux …</code></dt><dd>Check the architecture with <code>arena specs</code>. Build with <code>arena build -- ...</code>, or submit a <code>#!</code> script.</dd></div>
         <div><dt><code>NAME is not installed on the judge</code></dt><dd>Your <code>#!</code> line names a program the judge lacks. Use <code>python3</code> or build an executable.</dd></div>
         <div><dt>The source archive is over 16 MiB</dt><dd>Point <code>--src</code> at your source files, not at a folder of build output.</dd></div>
         <div><dt><code>wrong name or password</code></dt><dd>Check your username. If you forgot your password, ask the organiser to reset it.</dd></div>
