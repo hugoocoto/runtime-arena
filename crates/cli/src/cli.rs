@@ -230,6 +230,13 @@ pub enum RoundCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Export the statements, limits, and public samples of a round.
+    Export {
+        #[arg(value_parser = positive_id)]
+        id: i64,
+        #[arg(short, long, value_hint = clap::ValueHint::FilePath)]
+        output: Option<PathBuf>,
+    },
     /// Start a round.
     Start {
         #[arg(value_parser = positive_id)]

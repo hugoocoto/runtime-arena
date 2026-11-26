@@ -129,6 +129,45 @@ async fn organiser_and_participant_flow() {
     )
     .await
     .unwrap();
+    let exports = tempfile::tempdir().unwrap();
+    let bundle = exports.path().join("round.tar.gz");
+    admin::round_export(&admin_client, 1, &bundle)
+        .await
+        .unwrap();
+    let gzip = flate2::read::GzDecoder::new(std::fs::File::open(&bundle).unwrap());
+    let mut tar = tar::Archive::new(gzip);
+    let files: std::collections::BTreeMap<_, _> = tar
+        .entries()
+        .unwrap()
+        .map(|entry| {
+            use std::io::Read;
+            let mut entry = entry.unwrap();
+            let path = entry.path().unwrap().into_owned();
+            let mut contents = String::new();
+            entry.read_to_string(&mut contents).unwrap();
+            (path.to_str().unwrap().to_owned(), contents)
+        })
+        .collect();
+    assert_eq!(
+        files.keys().map(String::as_str).collect::<Vec<_>>(),
+        [
+            "manifest.json",
+            "sum/samples/01.in",
+            "sum/samples/01.out",
+            "sum/statement.md",
+        ]
+    );
+    let manifest: serde_json::Value = serde_json::from_str(&files["manifest.json"]).unwrap();
+    assert_eq!(manifest["round_id"], 1);
+    assert_eq!(manifest["problems"][0]["time_limit_ms"], 1000);
+    assert_eq!(manifest["problems"][0]["memory_limit_mb"], 256);
+    assert_eq!(files["sum/samples/01.in"], "3 4\n");
+    assert!(
+        admin::round_export(&admin_client, 1, &bundle)
+            .await
+            .is_err()
+    );
+
     admin::round_action(&admin_client, 1, "start", None)
         .await
         .unwrap();
