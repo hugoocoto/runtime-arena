@@ -606,3 +606,55 @@ async fn participant_guide_is_public() {
     assert_eq!(status, StatusCode::OK);
     assert!(body.as_str().unwrap().contains("arena submit"));
 }
+
+#[tokio::test]
+async fn problem_statements_survive_data_directory_relocation() {
+    let parent = tempfile::tempdir().unwrap();
+    let original = parent.path().join("original");
+    let relocated = parent.path().join("relocated");
+    let s = TestServer::with_config(|c| c.data_dir = original.clone()).await;
+    for slug in ["portable", "legacy"] {
+        let (status, body) = s.upload_problem(slug, common::problem_archive("sum")).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+    let relative: String = sqlx::query_scalar("SELECT dir FROM problems WHERE slug = 'portable'")
+        .fetch_one(&s.state.db)
+        .await
+        .unwrap();
+    assert_eq!(relative, "problems/portable/v1");
+
+    let legacy_version = original.join("problems/legacy/v1");
+    let wrapped = legacy_version.join("wrapped");
+    std::fs::create_dir(&wrapped).unwrap();
+    for file in ["problem.toml", "tests"] {
+        std::fs::rename(legacy_version.join(file), wrapped.join(file)).unwrap();
+    }
+    std::fs::write(wrapped.join("statement.md"), "Legacy statement").unwrap();
+    sqlx::query("UPDATE problems SET dir = ? WHERE slug = 'legacy'")
+        .bind(wrapped.to_str().unwrap())
+        .execute(&s.state.db)
+        .await
+        .unwrap();
+
+    s.state.db.close().await;
+    drop(s);
+    std::fs::rename(&original, &relocated).unwrap();
+    let s = TestServer::with_config(|c| c.data_dir = relocated.clone()).await;
+    for slug in ["portable", "legacy"] {
+        let (status, body) = s.get(&format!("/api/problems/{slug}"), Some(ADMIN)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let statement: ProblemStatement = serde_json::from_value(body).unwrap();
+        assert_eq!(statement.samples[0].input, "3 4\n");
+        if slug == "legacy" {
+            assert_eq!(statement.statement, "Legacy statement");
+        }
+    }
+
+    std::fs::remove_file(relocated.join("problems/legacy/v1/wrapped/problem.toml")).unwrap();
+    let (status, body) = s.get("/api/problems/legacy", Some(ADMIN)).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        body,
+        json!({"error": "statement or samples for problem legacy are unavailable"})
+    );
+}

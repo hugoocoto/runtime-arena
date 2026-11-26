@@ -8,6 +8,7 @@ use arena_protocol::{ProblemStatement, ProblemSummary, Sample};
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 
 use crate::auth::{Admin, Caller};
 use crate::error::{ApiError, ApiResult};
@@ -42,8 +43,8 @@ impl ProblemRow {
     }
 
     /// Loads the judge's view of this problem version from disk.
-    pub fn load(&self) -> Result<Problem, ApiError> {
-        Problem::load(&self.dir).map_err(ApiError::internal)
+    fn load(&self, state: &AppState) -> Result<Problem, arena_judge::Error> {
+        Problem::load(resolve_dir(&state.config.data_dir, &self.dir))
     }
 }
 
@@ -59,15 +60,43 @@ pub(crate) async fn find(state: &AppState, slug: &str) -> ApiResult<ProblemRow> 
     .ok_or_else(|| ApiError::not_found(format!("no problem {slug}")))
 }
 
-/// `GET /api/admin/problems`
-pub async fn list(_: Admin, State(state): State<AppState>) -> ApiResult<Json<Vec<ProblemSummary>>> {
-    let rows = sqlx::query_as!(
+/// Rebase paths saved by older servers, including paths saved with a relative
+/// data directory. The stored suffix also preserves a wrapped archive's root.
+pub(crate) fn resolve_dir(data_dir: &FsPath, stored: &str) -> PathBuf {
+    let path = FsPath::new(stored);
+    let root = path
+        .ancestors()
+        .skip(2)
+        .find(|ancestor| ancestor.file_name().is_some_and(|name| name == "problems"));
+    let relative = root
+        .and_then(FsPath::parent)
+        .and_then(|parent| path.strip_prefix(parent).ok())
+        .unwrap_or(path);
+    data_dir.join(relative)
+}
+
+async fn all(state: &AppState) -> Result<Vec<ProblemRow>, sqlx::Error> {
+    sqlx::query_as!(
         ProblemRow,
         "SELECT id, slug, title, version, dir, time_limit_ms, memory_limit_kib, test_count
          FROM problems ORDER BY slug"
     )
     .fetch_all(&state.db)
-    .await?;
+    .await
+}
+
+pub(crate) async fn validate_storage(state: &AppState) -> Result<(), sqlx::Error> {
+    for row in all(state).await? {
+        if let Err(error) = row.load(state) {
+            tracing::error!(problem = %row.slug, version = row.version, %error, "cannot load stored problem");
+        }
+    }
+    Ok(())
+}
+
+/// `GET /api/admin/problems`
+pub async fn list(_: Admin, State(state): State<AppState>) -> ApiResult<Json<Vec<ProblemSummary>>> {
+    let rows = all(&state).await?;
     Ok(Json(rows.iter().map(ProblemRow::summary).collect()))
 }
 
@@ -136,7 +165,12 @@ pub async fn upload(
         }
     };
 
-    let dir_str = problem.dir.to_string_lossy().into_owned();
+    let dir_str = problem
+        .dir
+        .strip_prefix(&state.config.data_dir)
+        .map_err(ApiError::internal)?
+        .to_string_lossy()
+        .into_owned();
     let time_limit_ms = problem.time_limit.as_millis() as i64;
     let memory_limit_kib = problem.memory_limit_kib as i64;
     let test_count = problem.tests.len() as i64;
@@ -275,35 +309,59 @@ pub async fn statement(
         }
     }
 
-    let problem = row.load()?;
-    let statement = std::fs::read_to_string(problem.dir.join("statement.md")).unwrap_or_default();
+    read_statement(
+        &row,
+        &row.load(&state)
+            .map_err(|error| unavailable(&slug, error))?,
+    )
+    .map(Json)
+    .map_err(|error| unavailable(&slug, error))
+}
+
+fn unavailable(slug: &str, error: impl std::fmt::Display) -> ApiError {
+    tracing::error!(problem = %slug, %error, "cannot serve problem statement");
+    ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,
+        format!("statement or samples for problem {slug} are unavailable"),
+    )
+}
+
+fn read_statement(row: &ProblemRow, problem: &Problem) -> Result<ProblemStatement, String> {
+    let statement_path = problem.dir.join("statement.md");
+    let statement = match std::fs::read_to_string(&statement_path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => {
+            return Err(format!("reading {}: {error}", statement_path.display()));
+        }
+    };
     let mut samples = Vec::new();
     for name in &problem.samples {
         let test = problem
             .tests
             .iter()
             .find(|t| &t.name == name)
-            .ok_or_else(|| ApiError::internal(format!("sample {name} missing in {slug}")))?;
+            .ok_or_else(|| format!("sample {name} missing in {}", row.slug))?;
         samples.push(Sample {
             name: name.clone(),
             input: read_capped(&test.input)?,
             output: read_capped(&test.answer)?,
         });
     }
-    Ok(Json(ProblemStatement {
+    Ok(ProblemStatement {
         slug: row.slug.clone(),
         title: row.title.clone(),
         time_limit_ms: row.time_limit_ms as u64,
         memory_limit_mb: row.memory_limit_kib as u64 / 1024,
         statement,
         samples,
-    }))
+    })
 }
 
-fn read_capped(path: &FsPath) -> ApiResult<String> {
+fn read_capped(path: &FsPath) -> Result<String, String> {
     let mut buf = Vec::new();
     std::fs::File::open(path)
         .and_then(|f| f.take(MAX_SAMPLE_BYTES).read_to_end(&mut buf))
-        .map_err(ApiError::internal)?;
+        .map_err(|error| format!("reading {}: {error}", path.display()))?;
     Ok(String::from_utf8_lossy(&buf).into_owned())
 }
