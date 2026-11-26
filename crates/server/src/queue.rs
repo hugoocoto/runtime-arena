@@ -3,7 +3,8 @@
 use std::time::Duration;
 
 use arena_judge::Problem;
-use arena_protocol::{JudgeReport, ServerEvent, Verdict};
+use arena_protocol::{JudgeReport, QueueStatus, ServerEvent, Verdict};
+use sqlx::SqliteConnection;
 
 use crate::submissions::{executable_path, verdict_str};
 use crate::{AppState, Event, now};
@@ -22,7 +23,7 @@ struct Job {
 
 /// Submissions left `judging` by a crash or restart go back to the queue.
 pub(crate) async fn requeue_interrupted(state: &AppState) -> Result<(), sqlx::Error> {
-    let n = sqlx::query!("UPDATE submissions SET status = 'queued' WHERE status = 'judging'")
+    let n = sqlx::query!("UPDATE submissions SET status = 'queued', judging_started_at = NULL WHERE status = 'judging'")
         .execute(&state.db)
         .await?
         .rows_affected();
@@ -34,14 +35,60 @@ pub(crate) async fn requeue_interrupted(state: &AppState) -> Result<(), sqlx::Er
 
 /// Atomically takes the oldest queued submission.
 async fn claim(state: &AppState) -> Result<Option<Job>, sqlx::Error> {
+    let t = now();
     sqlx::query_as!(
         Job,
-        "UPDATE submissions SET status = 'judging'
+        "UPDATE submissions SET status = 'judging', judging_started_at = ?
          WHERE id = (SELECT id FROM submissions WHERE status = 'queued' ORDER BY id LIMIT 1)
          RETURNING id, user_id, round_id, problem_id, problem_version, problem_dir",
+        t
     )
     .fetch_optional(&state.db)
     .await
+}
+
+/// All workers share one queue, including unfinished jobs from earlier rounds.
+pub(crate) async fn status(
+    state: &AppState,
+    conn: &mut SqliteConnection,
+    round_id: i64,
+    exclude_queued: u64,
+) -> Result<QueueStatus, sqlx::Error> {
+    let counts = sqlx::query!(
+        r#"SELECT COUNT(*) FILTER (WHERE status = 'queued') AS "queued!",
+                  COUNT(*) FILTER (WHERE status = 'judging') AS "judging!"
+           FROM submissions WHERE status IN ('queued', 'judging')"#
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    let queued = (counts.queued as u64).saturating_sub(exclude_queued);
+    let judging = counts.judging as u64;
+    let workers = state.config.judge_boxes.len() as u64;
+    let estimated_wait_seconds = match (queued + judging).checked_div(workers) {
+        None => None,
+        Some(0) => Some(0),
+        Some(waves) => {
+            let mut times = sqlx::query_scalar!(
+                r#"SELECT judged_at - judging_started_at AS "duration!"
+                   FROM submissions
+                   WHERE round_id = ? AND status = 'done' AND judged_at >= judging_started_at
+                   ORDER BY judged_at DESC, id DESC LIMIT 31"#,
+                round_id
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+            times.sort_unstable();
+            times
+                .get(times.len() / 2)
+                .map(|&seconds| waves.saturating_mul((seconds as u64).max(1)))
+        }
+    };
+    Ok(QueueStatus {
+        queued,
+        judging,
+        workers,
+        estimated_wait_seconds,
+    })
 }
 
 pub(crate) async fn worker(state: AppState, box_id: u32) {

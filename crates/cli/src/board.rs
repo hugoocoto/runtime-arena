@@ -601,6 +601,7 @@ mod tests {
                     test_count: 2,
                 }],
                 server_time: format::now(),
+                queue: None,
             },
         });
         s.apply(ServerEvent::Board {

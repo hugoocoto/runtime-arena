@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "UPDATE submissions SET status = 'judging'\n         WHERE id = (SELECT id FROM submissions WHERE status = 'queued' ORDER BY id LIMIT 1)\n         RETURNING id, user_id, round_id, problem_id, problem_version, problem_dir",
+  "query": "UPDATE submissions SET status = 'judging', judging_started_at = ?\n         WHERE id = (SELECT id FROM submissions WHERE status = 'queued' ORDER BY id LIMIT 1)\n         RETURNING id, user_id, round_id, problem_id, problem_version, problem_dir",
   "describe": {
     "columns": [
       {
@@ -71,7 +71,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "1326f0c09e9461340a75309ebde0e27c53ea100ca7ab11838d780157cf162181"
+  "hash": "f36073bb14701c9a4be56c9a59c74772ae1ef6509fbedc64b650cf336f19c02c"
 }

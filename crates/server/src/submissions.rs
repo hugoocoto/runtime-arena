@@ -2,7 +2,9 @@
 
 use std::path::{Path as FsPath, PathBuf};
 
-use arena_protocol::{JudgeReport, RoundState, SubmissionInfo, SubmissionStatus, Verdict};
+use arena_protocol::{
+    JudgeReport, QueuePosition, RoundState, SubmissionInfo, SubmissionStatus, Verdict,
+};
 use axum::Json;
 use axum::body::Body;
 use axum::extract::{Multipart, Path, Query, State};
@@ -32,6 +34,7 @@ pub(crate) struct SubmissionRow {
     pub report: Option<String>,
     pub submitted_at: i64,
     pub judged_at: Option<i64>,
+    pub judging_started_at: Option<i64>,
 }
 
 impl SubmissionRow {
@@ -54,6 +57,8 @@ impl SubmissionRow {
             memory_kib: self.memory_kib.map(|v| v as u64),
             submitted_at: self.submitted_at,
             judged_at: self.judged_at,
+            judging_started_at: self.judging_started_at,
+            queue_position: None,
             report: self
                 .report
                 .as_deref()
@@ -76,7 +81,7 @@ fn parse_verdict(s: &str) -> Option<Verdict> {
 pub(crate) async fn find(state: &AppState, id: i64) -> ApiResult<(i64, SubmissionRow)> {
     let row = sqlx::query!(
         "SELECT s.id, s.user_id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version,
-                s.status, s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at
+                s.status, s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at, s.judging_started_at
          FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id
          WHERE s.id = ?",
         id
@@ -99,6 +104,7 @@ pub(crate) async fn find(state: &AppState, id: i64) -> ApiResult<(i64, Submissio
             report: row.report,
             submitted_at: row.submitted_at,
             judged_at: row.judged_at,
+            judging_started_at: row.judging_started_at,
         },
     ))
 }
@@ -111,7 +117,7 @@ async fn list(
     let rows = sqlx::query_as!(
         SubmissionRow,
         "SELECT s.id, u.name AS user, s.round_id, p.slug AS problem, s.problem_version, s.status,
-                s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at
+                s.verdict, s.time_us, s.memory_kib, s.report, s.submitted_at, s.judged_at, s.judging_started_at
          FROM submissions s JOIN users u ON u.id = s.user_id JOIN problems p ON p.id = s.problem_id
          WHERE s.round_id = ? AND (? IS NULL OR s.user_id = ?)
          ORDER BY s.id",
@@ -217,6 +223,7 @@ pub async fn create(
     )
     .fetch_one(&mut *tx)
     .await?;
+    let load = crate::queue::status(&state, &mut tx, round.id, 1).await?;
     let sub_dir = dir(&state, id);
     write_files(&sub_dir, &executable, &source)
         .await
@@ -227,7 +234,12 @@ pub async fn create(
     state.queue.notify_one();
     tracing::info!(submission = id, user = %user.name, problem = %problem, "submission queued");
     let (_, row) = find(&state, id).await?;
-    Ok((StatusCode::CREATED, Json(row.info())))
+    let mut info = row.info();
+    info.queue_position = Some(QueuePosition {
+        ahead: load.queued,
+        estimated_wait_seconds: load.estimated_wait_seconds,
+    });
+    Ok((StatusCode::CREATED, Json(info)))
 }
 
 async fn write_files(dir: &FsPath, executable: &[u8], source: &[u8]) -> std::io::Result<()> {
@@ -361,7 +373,7 @@ pub async fn rejudge(
 ) -> ApiResult<Json<SubmissionInfo>> {
     let updated = sqlx::query!(
         "UPDATE submissions SET status = 'queued', verdict = NULL, time_us = NULL,
-            memory_kib = NULL, report = NULL, error = NULL, judged_at = NULL,
+            memory_kib = NULL, report = NULL, error = NULL, judged_at = NULL, judging_started_at = NULL,
             problem_version = (SELECT version FROM problems WHERE id = submissions.problem_id),
             problem_dir = (SELECT dir FROM problems WHERE id = submissions.problem_id)
          WHERE id = ? AND status IN ('done', 'failed')",

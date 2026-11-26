@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT judged_at - judging_started_at AS \"duration!\"\n                   FROM submissions\n                   WHERE round_id = ? AND status = 'done' AND judged_at >= judging_started_at\n                   ORDER BY judged_at DESC, id DESC LIMIT 31",
+  "describe": {
+    "columns": [
+      {
+        "name": "duration!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b3ba66ea91cd3eec825307431807ed4aae96acbdf7eb947a5f80759fbe9b38dd"
+}

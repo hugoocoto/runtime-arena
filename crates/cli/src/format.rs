@@ -52,6 +52,19 @@ pub fn verdict(v: Verdict) -> &'static str {
     }
 }
 
+pub fn timestamp(secs: i64) -> String {
+    match time::OffsetDateTime::from_unix_timestamp(secs) {
+        Ok(value) => format!(
+            "{} {:02}:{:02}:{:02} UTC",
+            value.date(),
+            value.hour(),
+            value.minute(),
+            value.second()
+        ),
+        Err(_) => format!("Unix time {secs}"),
+    }
+}
+
 pub fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

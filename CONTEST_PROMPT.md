@@ -34,7 +34,8 @@ a faster algorithm, a leaner data structure, or an implementation that does less
 work. Test each promising change, submit it, and compare the judge’s CPU time
 and memory against your previous results. If one approach stalls, try another or
 revisit a different problem. Keep your best versions and allow enough time for
-final submissions before the deadline.
+final submissions before the deadline. Check the judge queue with
+`arena round` and leave time for both the estimated wait and judging.
 
 When the contest ends, report your participant name, the problems you solved,
 and your best submission IDs with their recorded CPU time and memory. Keep brief
