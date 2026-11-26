@@ -2,17 +2,21 @@
 
 use std::path::{Path as FsPath, PathBuf};
 
-use arena_protocol::{JudgeReport, RoundState, SubmissionInfo, SubmissionStatus, Verdict};
+use arena_protocol::{
+    JudgeReport, SUBMISSION_CLIENT_TIME_HEADER, SubmissionInfo, SubmissionRefusal,
+    SubmissionStatus, Verdict,
+};
 use axum::Json;
 use axum::body::Body;
+use axum::extract::multipart::MultipartRejection;
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::Response;
 use serde::Deserialize;
 
 use crate::auth::{Admin, Caller, Participant};
 use crate::error::{ApiError, ApiResult};
-use crate::{AppState, now};
+use crate::{AppState, now, valid_slug};
 
 const MAX_EXECUTABLE: usize = 64 * 1024 * 1024;
 const MAX_SOURCE: usize = 16 * 1024 * 1024;
@@ -140,9 +144,60 @@ pub(crate) fn executable_path(state: &AppState, id: i64) -> PathBuf {
 pub async fn create(
     user: Participant,
     State(state): State<AppState>,
-    mut form: Multipart,
+    headers: HeaderMap,
+    form: Result<Multipart, MultipartRejection>,
 ) -> ApiResult<(StatusCode, Json<SubmissionInfo>)> {
-    let (mut problem, mut executable, mut source) = (None, None, None);
+    let received_at = now();
+    let client_at: Option<i64> = headers
+        .get(SUBMISSION_CLIENT_TIME_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok());
+    let mut attempt = Attempt::default();
+    let result = intake(&user, &state, form, &mut attempt).await;
+    if let Err(error) = &result
+        && error.status.is_client_error()
+    {
+        let refused_at = now();
+        let problem = attempt.problem.as_deref().filter(|slug| valid_slug(slug));
+        tracing::info!(
+            user = %user.name, ?problem, reason = attempt.reason,
+            ?client_at, received_at, refused_at, "submission refused"
+        );
+        if let Err(error) = sqlx::query!(
+            "INSERT INTO submission_refusals
+             (user_id, problem, reason, client_at, received_at, refused_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            user.id,
+            problem,
+            attempt.reason,
+            client_at,
+            received_at,
+            refused_at
+        )
+        .execute(&state.db)
+        .await
+        {
+            tracing::error!(%error, user = %user.name, "cannot persist submission refusal");
+        }
+    }
+    result
+}
+
+#[derive(Default)]
+struct Attempt {
+    problem: Option<String>,
+    reason: &'static str,
+}
+
+async fn intake(
+    user: &Participant,
+    state: &AppState,
+    form: Result<Multipart, MultipartRejection>,
+    attempt: &mut Attempt,
+) -> ApiResult<(StatusCode, Json<SubmissionInfo>)> {
+    attempt.reason = "invalid_multipart";
+    let mut form = form.map_err(|error| ApiError::new(error.status(), error.body_text()))?;
+    let (mut executable, mut source) = (None, None);
     while let Some(field) = form
         .next_field()
         .await
@@ -154,33 +209,40 @@ pub async fn create(
             .await
             .map_err(|e| ApiError::bad_request(e.to_string()))?;
         match name.as_str() {
-            "problem" => problem = Some(String::from_utf8_lossy(&bytes).trim().to_owned()),
+            "problem" => attempt.problem = Some(String::from_utf8_lossy(&bytes).trim().to_owned()),
             "executable" => executable = Some(bytes),
             "source" => source = Some(bytes),
             _ => return Err(ApiError::bad_request(format!("unexpected field {name:?}"))),
         }
     }
-    let problem = problem.ok_or_else(|| ApiError::bad_request("missing field problem"))?;
+    attempt.reason = "missing_field";
+    let problem = attempt
+        .problem
+        .as_deref()
+        .ok_or_else(|| ApiError::bad_request("missing field problem"))?;
     let executable = executable.ok_or_else(|| ApiError::bad_request("missing field executable"))?;
     let source = source.filter(|s| !s.is_empty()).ok_or_else(|| {
         ApiError::bad_request("missing field source (your source code is required)")
     })?;
+    attempt.reason = "upload_too_large";
     if executable.len() > MAX_EXECUTABLE {
         return Err(ApiError::bad_request("executable is larger than 64 MiB"));
     }
     if source.len() > MAX_SOURCE {
         return Err(ApiError::bad_request("source is larger than 16 MiB"));
     }
+    attempt.reason = "bad_binary";
     check_executable(&executable).map_err(ApiError::bad_request)?;
 
     // One intake at a time: the round, cooldown and insert checks must not interleave.
     let _guard = state.submit_lock.lock().await;
     let t = now();
-    let round = crate::rounds::running(&state)
+    attempt.reason = "round_not_running";
+    let round = crate::rounds::running(state, t)
         .await?
         .ok_or_else(|| ApiError::conflict("no round is running"))?;
-    debug_assert_eq!(round.state(t), RoundState::Running);
-    let target = crate::rounds::problems(&state, round.id)
+    attempt.reason = "problem_not_in_round";
+    let target = crate::rounds::problems(state, round.id)
         .await?
         .into_iter()
         .find(|p| p.slug == problem)
@@ -196,6 +258,7 @@ pub async fn create(
     if let Some(last) = last {
         let wait = last + round.cooldown_s - t;
         if wait > 0 {
+            attempt.reason = "cooldown";
             return Err(ApiError::new(
                 StatusCode::TOO_MANY_REQUESTS,
                 format!("wait {wait} s before submitting again"),
@@ -217,7 +280,7 @@ pub async fn create(
     )
     .fetch_one(&mut *tx)
     .await?;
-    let sub_dir = dir(&state, id);
+    let sub_dir = dir(state, id);
     write_files(&sub_dir, &executable, &source)
         .await
         .map_err(ApiError::internal)?;
@@ -226,7 +289,7 @@ pub async fn create(
 
     state.queue.notify_one();
     tracing::info!(submission = id, user = %user.name, problem = %problem, "submission queued");
-    let (_, row) = find(&state, id).await?;
+    let (_, row) = find(state, id).await?;
     Ok((StatusCode::CREATED, Json(row.info())))
 }
 
@@ -320,6 +383,22 @@ pub async fn mine(
 ) -> ApiResult<Json<Vec<SubmissionInfo>>> {
     let round = round_or_current(&state, q.round).await?;
     Ok(Json(list(&state, round, Some(user.id)).await?))
+}
+
+/// `GET /api/me/submission-refusals`: the participant's authenticated refusals.
+pub async fn mine_refusals(
+    user: Participant,
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<SubmissionRefusal>>> {
+    let attempts = sqlx::query_as!(
+        SubmissionRefusal,
+        "SELECT problem, reason, client_at, received_at, refused_at
+         FROM submission_refusals WHERE user_id = ? ORDER BY id",
+        user.id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+    Ok(Json(attempts))
 }
 
 /// `GET /api/admin/submissions?round=ID`: everyone's submissions.

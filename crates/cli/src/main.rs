@@ -111,7 +111,13 @@ async fn run(cli: Cli) -> Result<bool> {
             let src = ask::path("Source file or directory", "--src", src)?;
             return participant::submit(&config, &problem, &executable, &src, !no_wait).await;
         }
-        Command::Submissions { id, json } => participant::submissions(&config, id, json).await?,
+        Command::Submissions { id, json, refused } => {
+            if refused {
+                participant::submission_refusals(&config).await?;
+            } else {
+                participant::submissions(&config, id, json).await?;
+            }
+        }
         Command::Board { once, json } => {
             let client = Client::with_ca(
                 config.server()?,

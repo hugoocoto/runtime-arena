@@ -3,7 +3,9 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use arena_protocol::{ApiError, ServerEvent, ServerInfo};
+use arena_protocol::{
+    ApiError, SUBMISSION_CLIENT_TIME_HEADER, ServerEvent, ServerInfo, SubmissionInfo,
+};
 use futures_util::StreamExt;
 use reqwest::{Method, RequestBuilder, Response, StatusCode};
 use rustls::RootCertStore;
@@ -292,14 +294,15 @@ impl Client {
         self.parse(resp).await
     }
 
-    pub async fn post_multipart<T: DeserializeOwned>(
-        &self,
-        path: &str,
-        form: reqwest::multipart::Form,
-    ) -> Result<T> {
-        let resp = self
-            .send(self.request(Method::POST, path).multipart(form))
-            .await?;
+    pub async fn submit(&self, form: reqwest::multipart::Form) -> Result<SubmissionInfo> {
+        let request = self
+            .request(Method::POST, "/api/submissions")
+            .header(
+                SUBMISSION_CLIENT_TIME_HEADER,
+                crate::format::now().to_string(),
+            )
+            .multipart(form);
+        let resp = self.send(request).await?;
         self.parse(resp).await
     }
 

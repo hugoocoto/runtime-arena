@@ -271,6 +271,22 @@ pub struct SubmissionInfo {
     pub report: Option<JudgeReport>,
 }
 
+/// Optional Unix-seconds timestamp header on a submission request.
+pub const SUBMISSION_CLIENT_TIME_HEADER: &str = "x-arena-client-time";
+
+/// An authenticated submission attempt rejected before queue admission.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubmissionRefusal {
+    pub problem: Option<String>,
+    pub reason: String,
+    /// Optional, untrusted timestamp supplied by the client, in Unix seconds.
+    pub client_at: Option<i64>,
+    /// Server time at the start of intake, before reading the submission body.
+    pub received_at: i64,
+    /// Server time when the refusal was decided.
+    pub refused_at: i64,
+}
+
 /// One participant's best accepted result on a problem.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BoardEntry {
