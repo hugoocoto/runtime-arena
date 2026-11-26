@@ -409,6 +409,8 @@ const liquid = (() => {
 })();
 
 const ROTATE_SECONDS = 20;
+let requestedProblem = null;
+try { requestedProblem = decodeURIComponent(location.hash.slice(1)) || null; } catch {}
 const state = { ready: false, connected: false, round: null, boards: {}, selected: null, pinned: false, previous: {},
   offset: 0, rotateLeft: ROTATE_SECONDS, me: "", lastData: null };
 const $ = (id) => document.getElementById(id);
@@ -699,6 +701,13 @@ function handle(event) {
     case "round":
       if (state.round?.id !== event.round.id) { state.boards = {}; state.previous = {}; }
       state.round = event.round;
+      if (requestedProblem) {
+        if (state.round.problems.some((p) => p.slug === requestedProblem)) {
+          state.selected = requestedProblem;
+          state.pinned = true;
+        }
+        requestedProblem = null;
+      }
       state.offset = event.round.server_time - Math.floor(Date.now() / 1000);
       break;
     case "board":
@@ -792,8 +801,6 @@ setInterval(() => {
 
 state.me = store.get("arena.me");
 $("me").value = state.me;
-const wanted = decodeURIComponent(location.hash.slice(1));
-if (wanted) { state.selected = wanted; state.pinned = true; }
 fetch("/api/info").then((r) => r.json()).then((i) => { $("source").href = i.source_url; }).catch(() => {});
 render();
 connect();
