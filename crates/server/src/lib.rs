@@ -125,6 +125,7 @@ pub async fn start_background(state: &AppState) -> Result<(), sqlx::Error> {
             "cgroup root is missing; CPU times fall back to isolate's milliseconds"
         );
     }
+    problems::validate_storage(state).await?;
     queue::requeue_interrupted(state).await?;
     for &box_id in &state.config.judge_boxes {
         tokio::spawn(queue::worker(state.clone(), box_id));
@@ -171,6 +172,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/logout", post(accounts::logout))
         .route("/api/me/submissions", get(submissions::mine))
         .route("/api/rounds/current", get(rounds::current))
+        .route("/api/rounds/current/boards", get(boards::current_boards))
         .route("/api/rounds/{id}/boards", get(boards::round_boards))
         .route(
             "/api/rounds/{id}/problems/{slug}/accepted",

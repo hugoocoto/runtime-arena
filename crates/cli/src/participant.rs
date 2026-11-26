@@ -1,7 +1,7 @@
 //! Commands for participants: signup, login, logout, round, problem, submit, submissions, build.
 
 use std::collections::VecDeque;
-use std::io::Write;
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -45,21 +45,48 @@ pub fn participant(config: &Config) -> Result<Client> {
 
 fn trust_server(server: &str) -> Result<String> {
     let server = server.trim().trim_end_matches('/');
-    if server.is_empty() {
-        bail!("no server address given");
-    }
     let server = if server.starts_with("https://") {
         server.to_owned()
-    } else if server.starts_with("http://") {
+    } else if server.is_empty() || server.contains("://") {
         bail!("LAN trust needs the final HTTPS address, for example https://192.168.1.42");
     } else {
         format!("https://{server}")
     };
-    Ok(crate::client::normalise_server(&server))
+    let url = reqwest::Url::parse(&server).context("invalid HTTPS server address")?;
+    if url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        bail!("give an HTTPS server address without credentials, a query, or a fragment");
+    }
+    Ok(server)
 }
 
-/// Downloads and saves the CA used by a LAN Caddy deployment.
-pub async fn trust(server: Option<&str>, yes: bool) -> Result<()> {
+fn parse_fingerprint(expected: &str) -> Result<String> {
+    let expected = expected.trim();
+    let hex = expected.replace(':', "");
+    if hex.len() != 64
+        || !hex.bytes().all(|b| b.is_ascii_hexdigit())
+        || (expected.contains(':') && expected.split(':').any(|pair| pair.len() != 2))
+    {
+        return Err(UsageError(
+            "--fingerprint must be a SHA-256 fingerprint (64 hex digits with optional colons)"
+                .into(),
+        )
+        .into());
+    }
+    Ok(hex.to_ascii_uppercase())
+}
+
+/// Saves the LAN CA after checking the given fingerprint or getting confirmation.
+pub async fn trust(
+    server: Option<&str>,
+    expected: Option<&str>,
+    ca_file: Option<&Path>,
+    yes: bool,
+) -> Result<()> {
     let server = match server {
         Some(server) => trust_server(server)?,
         None => {
@@ -67,18 +94,37 @@ pub async fn trust(server: Option<&str>, yes: bool) -> Result<()> {
             trust_server(&server)?
         }
     };
-    let certificate = Client::download_ca(&server).await?;
-    let fingerprint = Client::certificate_fingerprint(&certificate);
+    let expected = expected.map(parse_fingerprint).transpose()?;
+    if expected.is_none() && !yes && !ask::is_interactive() {
+        return Err(UsageError("missing --fingerprint in a non-interactive shell; use --yes only if you accept the CA without verification".into()).into());
+    }
+    let (certificate, fingerprint) = if let Some(path) = ca_file {
+        async {
+            let bytes = tokio::fs::read(path).await?;
+            Client::parse_ca(bytes)
+        }
+        .await
+        .with_context(|| format!("reading CA certificate from {}", path.display()))?
+    } else {
+        Client::download_ca(&server).await?
+    };
     println!("LAN CA SHA-256 fingerprint: {fingerprint}");
-    if !yes {
-        let answer: String = ask::required("Trust this certificate? Type yes", "--yes", None)?;
+    if let Some(expected) = expected {
+        if fingerprint.replace(':', "") != expected {
+            bail!(
+                "LAN CA fingerprint mismatch; check the server address and the fingerprint from the organiser"
+            );
+        }
+    } else if !yes {
+        let answer: String =
+            ask::required("Trust this certificate? Type yes", "--fingerprint", None)?;
         if answer != "yes" {
             bail!("certificate not trusted");
         }
     }
     let mut config = Config::load_file()?;
     config.set_server(&server);
-    config.ca_certificate = Some(String::from_utf8(certificate)?);
+    config.ca_certificate = Some(certificate);
     let path = config.save()?;
     println!(
         "Trusted LAN certificate for {server} in {}.",
@@ -549,20 +595,117 @@ pub async fn problem(
     Ok(())
 }
 
+#[derive(Default)]
+struct SourceSummary {
+    file_count: usize,
+    source_bytes: u64,
+    skipped_binaries: usize,
+    largest: Vec<(u64, PathBuf)>,
+}
+
+impl SourceSummary {
+    fn include(&mut self, name: &Path, bytes: u64) {
+        self.file_count += 1;
+        self.source_bytes += bytes;
+        self.largest.push((bytes, name.to_path_buf()));
+        self.largest
+            .sort_by_key(|(bytes, _)| std::cmp::Reverse(*bytes));
+        self.largest.truncate(3);
+    }
+
+    fn print(&self, archive_bytes: usize) {
+        let largest = self
+            .largest
+            .iter()
+            .map(|(bytes, name)| format!("{name:?} ({bytes} bytes)"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let largest = if largest.is_empty() {
+            String::new()
+        } else {
+            format!(" Largest: {largest}.")
+        };
+        eprintln!(
+            "Source archive: {} files, {} bytes before compression, {archive_bytes} bytes packed, {} binaries or submitted executables skipped.{largest}",
+            self.file_count, self.source_bytes, self.skipped_binaries,
+        );
+    }
+}
+
+fn read_magic(file: &mut std::fs::File) -> std::io::Result<Option<[u8; 4]>> {
+    let mut bytes = [0; 4];
+    match file.read_exact(&mut bytes) {
+        Ok(()) => Ok(Some(bytes)),
+        Err(error) if error.kind() == ErrorKind::UnexpectedEof => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+/// Check file signatures instead of names or executable permission bits, which
+/// are also commonly present on source scripts and may be absent on object files.
+fn compiled_binary(path: &Path) -> std::io::Result<bool> {
+    let mut file = std::fs::File::open(path)?;
+    match read_magic(&mut file)? {
+        Some(
+            [0x7f, b'E', b'L', b'F']
+            | [0xfe, 0xed, 0xfa, 0xce | 0xcf]
+            | [0xce | 0xcf, 0xfa, 0xed, 0xfe]
+            | [0xca, 0xfe, 0xba, 0xbe | 0xbf]
+            | [0xbe | 0xbf, 0xba, 0xfe, 0xca],
+        ) => Ok(true),
+        Some([b'M', b'Z', ..]) => {
+            // The DOS signature alone also matches text beginning with "MZ".
+            file.seek(SeekFrom::Start(0x3c))?;
+            let Some(offset) = read_magic(&mut file)?.map(u32::from_le_bytes) else {
+                return Ok(false);
+            };
+            if offset < 0x40 {
+                return Ok(false);
+            }
+            file.seek(SeekFrom::Start(u64::from(offset)))?;
+            Ok(read_magic(&mut file)? == Some(*b"PE\0\0"))
+        }
+        _ => Ok(false),
+    }
+}
+
 /// `.tar.gz` of a file or directory (skipping build output and VCS data).
-pub fn pack_source(path: &Path) -> Result<Vec<u8>> {
-    let bytes = pack(path, SKIP_DIRS)?;
+fn pack_source(path: &Path, executable: &Path) -> Result<(Vec<u8>, SourceSummary)> {
+    let executable = executable
+        .canonicalize()
+        .with_context(|| format!("cannot read {}", executable.display()))?;
+    let mut summary = SourceSummary::default();
+    let bytes = pack_files(path, SKIP_DIRS, |file, name, in_directory| {
+        if in_directory
+            && (file.canonicalize()? == executable
+                || compiled_binary(file)
+                    .with_context(|| format!("cannot read {}", file.display()))?)
+        {
+            summary.skipped_binaries += 1;
+            return Ok(false);
+        }
+        summary.include(name, file.metadata()?.len());
+        Ok(true)
+    })?;
     if bytes.len() > MAX_SOURCE {
         bail!(
             "the source archive is {} MiB; the limit is 16 MiB. Point --src at your source files only",
             bytes.len() / (1024 * 1024)
         );
     }
-    Ok(bytes)
+    Ok((bytes, summary))
 }
 
 /// `.tar.gz` of a file, or of a directory's regular files without the `skip` directories.
 pub fn pack(path: &Path, skip: &[&str]) -> Result<Vec<u8>> {
+    pack_files(path, skip, |_, _, _| Ok(true))
+}
+
+fn pack_files(
+    path: &Path,
+    skip: &[&str],
+    mut include: impl FnMut(&Path, &Path, bool) -> Result<bool>,
+) -> Result<Vec<u8>> {
     let gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     let mut tar = tar::Builder::new(gz);
     tar.follow_symlinks(false);
@@ -570,7 +713,10 @@ pub fn pack(path: &Path, skip: &[&str]) -> Result<Vec<u8>> {
         std::fs::metadata(path).with_context(|| format!("cannot read {}", path.display()))?;
     if meta.is_file() {
         let name = path.file_name().context("source has no file name")?;
-        tar.append_path_with_name(path, name)?;
+        let name = Path::new(name);
+        if include(path, name, false)? {
+            tar.append_path_with_name(path, name)?;
+        }
     } else {
         let mut stack = VecDeque::from([PathBuf::new()]);
         while let Some(rel) = stack.pop_front() {
@@ -589,7 +735,10 @@ pub fn pack(path: &Path, skip: &[&str]) -> Result<Vec<u8>> {
                         stack.push_back(rel_child);
                     }
                 } else if kind.is_file() {
-                    tar.append_path_with_name(entry.path(), &rel_child)?;
+                    let file = entry.path();
+                    if include(&file, &rel_child, true)? {
+                        tar.append_path_with_name(file, &rel_child)?;
+                    }
                 }
             }
         }
@@ -607,7 +756,8 @@ pub async fn submit(
     let client = participant(config)?;
     let exe = std::fs::read(executable)
         .with_context(|| format!("cannot read {}", executable.display()))?;
-    let src = pack_source(source)?;
+    let (src, summary) = pack_source(source, executable)?;
+    summary.print(src.len());
 
     // Listen before submitting so no progress event is missed.
     let mut events = if wait {
@@ -978,7 +1128,23 @@ mod tests {
         std::fs::create_dir_all(d.path().join("src/build")).unwrap();
         std::fs::write(d.path().join("src/build/gen.rs"), "").unwrap();
 
-        let bytes = pack_source(d.path()).unwrap();
+        let exe = d.path().join("sol");
+        std::fs::write(&exe, "#!/bin/sh").unwrap();
+        std::fs::write(d.path().join("binary"), b"\x7fELF").unwrap();
+        std::fs::write(d.path().join("src/util/other"), b"\xcf\xfa\xed\xfe").unwrap();
+        let mut pe = [0; 68];
+        pe[..2].copy_from_slice(b"MZ");
+        pe[0x3c] = 0x40;
+        pe[0x40..].copy_from_slice(b"PE\0\0");
+        std::fs::write(d.path().join("sol.exe"), pe).unwrap();
+        std::fs::write(d.path().join("helper.sh"), "#!/bin/sh").unwrap();
+        std::fs::write(d.path().join("notes.txt"), "MZ text").unwrap();
+
+        let (bytes, summary) = pack_source(d.path(), &exe).unwrap();
+        assert_eq!(summary.file_count, 5);
+        assert_eq!(summary.source_bytes, 28);
+        assert_eq!(summary.skipped_binaries, 4);
+        assert_eq!(summary.largest[0].1, Path::new("main.rs"));
         let mut ar = tar::Archive::new(flate2::read::GzDecoder::new(&bytes[..]));
         let mut names: Vec<String> = ar
             .entries()
@@ -986,7 +1152,24 @@ mod tests {
             .map(|e| e.unwrap().path().unwrap().display().to_string())
             .collect();
         names.sort();
-        assert_eq!(names, ["main.rs", "src/build/gen.rs", "src/util/mod.rs"]);
+        assert_eq!(
+            names,
+            [
+                "helper.sh",
+                "main.rs",
+                "notes.txt",
+                "src/build/gen.rs",
+                "src/util/mod.rs"
+            ]
+        );
+        // Organizer problem archives still need binaries such as a compiled checker.
+        let bytes = pack(d.path(), &[]).unwrap();
+        let mut ar = tar::Archive::new(flate2::read::GzDecoder::new(&bytes[..]));
+        assert!(
+            ar.entries()
+                .unwrap()
+                .any(|e| e.unwrap().path().unwrap() == Path::new("binary"))
+        );
     }
 
     #[test]
@@ -994,7 +1177,9 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let f = d.path().join("sol.c");
         std::fs::write(&f, "int main(){}").unwrap();
-        let bytes = pack_source(&f).unwrap();
+        let (bytes, summary) = pack_source(&f, &f).unwrap();
+        assert_eq!(summary.file_count, 1);
+        assert_eq!(summary.skipped_binaries, 0);
         let mut ar = tar::Archive::new(flate2::read::GzDecoder::new(&bytes[..]));
         let names: Vec<String> = ar
             .entries()

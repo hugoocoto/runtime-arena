@@ -4,12 +4,14 @@
 //! (by CPU time) and, when logged in, your own submissions.
 
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write as _;
+use std::io::IsTerminal;
 use std::time::Duration;
 
 use anyhow::Result;
 use arena_protocol::{
     AcceptedSubmission, Board, BoardEntry, RoundInfo, RoundState, ServerEvent, SubmissionInfo,
-    SubmissionStatus, Verdict,
+    SubmissionStatus, UserInfo, Verdict,
 };
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind, KeyModifiers};
 use futures_util::StreamExt;
@@ -19,9 +21,18 @@ use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Block, Cell, Chart, Dataset, GraphType, Paragraph, Row, Table, Tabs};
+use serde::{Deserialize, Serialize};
 
 use crate::client::Client;
+use crate::errors::UsageError;
 use crate::format;
+
+/// Output of `arena board --json`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BoardSnapshot {
+    pub round: RoundInfo,
+    pub boards: Vec<Board>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -128,7 +139,117 @@ impl State {
     }
 }
 
+pub async fn fetch_snapshot(client: &Client) -> Result<BoardSnapshot> {
+    let round: RoundInfo = client.get("/api/rounds/current").await?;
+    let boards: Vec<Board> = client
+        .get(&format!("/api/rounds/{}/boards", round.id))
+        .await?;
+    Ok(BoardSnapshot { round, boards })
+}
+
+pub async fn snapshot(client: &Client, logged_in: bool, json: bool) -> Result<()> {
+    let snapshot = fetch_snapshot(client).await?;
+    if json {
+        return format::print_json(&snapshot);
+    }
+    let me = if logged_in {
+        client.get::<UserInfo>("/api/me").await.ok().map(|u| u.name)
+    } else {
+        None
+    };
+    print!("{}", render_snapshot(&snapshot, me.as_deref()));
+    Ok(())
+}
+
+/// Formats a one-shot text view of the current round's Fastest and Leanest boards.
+pub fn render_snapshot(snapshot: &BoardSnapshot, me: Option<&str>) -> String {
+    let mut out = String::new();
+    let round = &snapshot.round;
+    let now = round.server_time;
+    let when = match round.state {
+        RoundState::Draft => "not started".to_owned(),
+        RoundState::Running => format!(
+            "running, {} left",
+            format::duration(round.ends_at.unwrap_or(now) - now)
+        ),
+        RoundState::Finished => "finished".to_owned(),
+    };
+    let frozen_note = if snapshot.boards.iter().any(|b| b.frozen) {
+        " — boards frozen"
+    } else {
+        ""
+    };
+    let _ = writeln!(
+        out,
+        "Round {}: {} ({when}){frozen_note}",
+        round.id, round.name
+    );
+    if snapshot.boards.is_empty() {
+        let _ = writeln!(out, "No problems in this round.");
+        return out;
+    }
+    for board in &snapshot.boards {
+        let title = round
+            .problems
+            .iter()
+            .find(|p| p.slug == board.problem)
+            .map(|p| p.title.as_str())
+            .filter(|t| *t != board.problem);
+        match title {
+            Some(title) => {
+                let _ = writeln!(out, "\n{} ({title})", board.problem);
+            }
+            None => {
+                let _ = writeln!(out, "\n{}", board.problem);
+            }
+        }
+        write_board_table(&mut out, "Fastest", &board.by_time, me);
+        write_board_table(&mut out, "Leanest", &board.by_memory, me);
+    }
+    out
+}
+
+fn write_board_table(out: &mut String, title: &str, entries: &[BoardEntry], me: Option<&str>) {
+    let _ = writeln!(out, "  {title}");
+    if entries.is_empty() {
+        let _ = writeln!(out, "    No accepted submissions yet.");
+        return;
+    }
+    let _ = writeln!(
+        out,
+        "    {:>3}  {:<24} {:>7}  {:>9}  {:>9}  {:>4}",
+        "#", "name", "sub", "time", "memory", "subs"
+    );
+    for e in entries {
+        let mut label = if e.display_name == e.user {
+            e.user.clone()
+        } else {
+            format!("{} ({})", e.display_name, e.user)
+        };
+        if me == Some(e.user.as_str()) {
+            label.push_str(" *");
+        }
+        let _ = writeln!(
+            out,
+            "    {:>3}  {:<24} {:>7}  {:>9}  {:>9}  {:>4}",
+            e.rank,
+            label,
+            format!("#{}", e.submission_id),
+            format::time(e.time_us),
+            format::memory(e.memory_kib),
+            e.attempts,
+        );
+    }
+}
+
 pub async fn run(client: Client, logged_in: bool) -> Result<()> {
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        return Err(UsageError(
+            "the live board needs a terminal; use `arena board --once` or `arena board --json`, or open the web leaderboard"
+                .into(),
+        )
+        .into());
+    }
     let mut state = State {
         status: format!("connecting to {}", client.base()),
         ..State::default()
@@ -688,5 +809,56 @@ mod tests {
         let bob: Vec<f64> = s["bob"].iter().map(|p| -p.1).collect();
         assert_eq!(bob, [1.0, 2.0]);
         assert_eq!(s["ann"][2].0, 3.0, "minutes since start");
+    }
+
+    #[test]
+    fn snapshot_text_includes_fastest_leanest_and_freeze_status() {
+        let state = sample_state();
+        let mut board = state.boards["sum"].clone();
+        board.frozen = true;
+        let snap = BoardSnapshot {
+            round: state.round.unwrap(),
+            boards: vec![board],
+        };
+        let text = render_snapshot(&snap, Some("ann"));
+        assert!(text.contains("Round 1: Final (running,"), "{text}");
+        assert!(text.contains("boards frozen"), "{text}");
+        assert!(text.contains("sum (Sum)"), "{text}");
+        assert!(text.contains("Fastest"), "{text}");
+        assert!(text.contains("Leanest"), "{text}");
+        assert!(text.contains("ANN (ann) *"), "{text}");
+        assert!(text.contains("#1"), "{text}");
+        assert!(text.contains("12 ms"), "{text}");
+        assert!(text.contains("900 KiB"), "{text}");
+        let fastest_idx = text.find("Fastest").unwrap();
+        let leanest_idx = text.find("Leanest").unwrap();
+        assert!(
+            text[fastest_idx..leanest_idx].find("ANN").unwrap()
+                < text[fastest_idx..leanest_idx].find("BOB").unwrap(),
+            "{text}"
+        );
+        assert!(
+            text[leanest_idx..].find("BOB").unwrap() < text[leanest_idx..].find("ANN").unwrap(),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn snapshot_text_handles_empty_boards() {
+        let mut snap = BoardSnapshot {
+            round: sample_state().round.unwrap(),
+            boards: vec![Board {
+                round_id: 1,
+                problem: "sum".into(),
+                frozen: false,
+                by_time: Vec::new(),
+                by_memory: Vec::new(),
+            }],
+        };
+        snap.round.state = RoundState::Finished;
+        let text = render_snapshot(&snap, None);
+        assert!(text.contains("Round 1: Final (finished)"), "{text}");
+        assert!(!text.contains("boards frozen"), "{text}");
+        assert!(text.contains("No accepted submissions yet."), "{text}");
     }
 }
