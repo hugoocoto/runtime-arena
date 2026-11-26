@@ -238,6 +238,37 @@ pub async fn create(
     Ok(Json(info(&state, find_row(&state, id).await?, true).await?))
 }
 
+/// `POST /api/admin/rounds/{id}/clone`: copy the settings and problems to a draft.
+pub async fn clone_round(
+    _: Admin,
+    State(state): State<AppState>,
+    Path(source_id): Path<i64>,
+) -> ApiResult<Json<RoundInfo>> {
+    let mut tx = state.db.begin().await?;
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO rounds (name, duration_s, freeze_s, cooldown_s, created_at)
+         SELECT name, duration_s, freeze_s, cooldown_s, ? FROM rounds WHERE id = ?
+         RETURNING id",
+    )
+    .bind(now())
+    .bind(source_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| ApiError::not_found(format!("no round {source_id}")))?;
+    sqlx::query(
+        "INSERT INTO round_problems (round_id, problem_id, position)
+         SELECT ?, problem_id, position FROM round_problems WHERE round_id = ?",
+    )
+    .bind(id)
+    .bind(source_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    tracing::info!(round = id, source_round = source_id, "round cloned");
+    Ok(Json(info(&state, find_row(&state, id).await?, true).await?))
+}
+
 /// `DELETE /api/admin/rounds/{id}`: removes a draft or finished round.
 pub async fn remove(
     _: Admin,

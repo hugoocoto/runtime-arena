@@ -224,6 +224,11 @@ pub enum RoundCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Copy a round's settings and problems to a new draft.
+    Clone {
+        #[arg(value_parser = positive_id)]
+        id: Option<i64>,
+    },
     /// Start a round.
     Start {
         #[arg(value_parser = positive_id)]

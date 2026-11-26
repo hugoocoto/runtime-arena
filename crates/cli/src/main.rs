@@ -165,6 +165,10 @@ async fn run(cli: Cli) -> Result<bool> {
                 AdminCommand::Round(RoundCommand::List { json }) => {
                     admin::round_list(&c, json).await?
                 }
+                AdminCommand::Round(RoundCommand::Clone { id }) => {
+                    let id = round_id(&c, id).await?;
+                    admin::round_action(&c, id, "clone", None).await?
+                }
                 AdminCommand::Round(RoundCommand::Start { id }) => {
                     let id = round_id(&c, id).await?;
                     admin::round_action(&c, id, "start", None).await?
